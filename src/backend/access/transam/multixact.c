@@ -1142,9 +1142,11 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 
 		/* Re-acquire lock and start over */
 		LWLockAcquire(MultiXactGenLock, LW_EXCLUSIVE);
+
+		if (MultiXactState->nextMXact < FirstMultiXactId)
+			MultiXactState->nextMXact = FirstMultiXactId;
+
 		result = MultiXactState->nextMXact;
-		if (result < FirstMultiXactId)
-			result = FirstMultiXactId;
 	}
 
 	/* Make sure there is room for the MXID in the file.  */
@@ -1260,7 +1262,13 @@ GetNewMultiXactId(int nmembers, MultiXactOffset *offset)
 	 */
 	(MultiXactState->nextMXact)++;
 
+	if (MultiXactState->nextMXact < FirstMultiXactId)
+		MultiXactState->nextMXact = FirstMultiXactId;
+
 	MultiXactState->nextOffset += nmembers;
+
+	if (MultiXactState->nextOffset == 0)
+		MultiXactState->nextOffset = 1;
 
 	LWLockRelease(MultiXactGenLock);
 
@@ -1439,7 +1447,7 @@ retry:
 	 */
 	tmpMXact = multi + 1;
 
-	if (nextMXact == tmpMXact)
+	if (nextMXact == tmpMXact || (tmpMXact == 0 && nextMXact==FirstMultiXactId))
 	{
 		/* Corner case 1: there is no next multixact */
 		length = nextOffset - offset;
