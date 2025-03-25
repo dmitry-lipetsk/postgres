@@ -71,6 +71,7 @@ static TransactionId set_newest_commit_ts_xid = 0;
 static Oid	set_oid = 0;
 static MultiXactId set_mxid = 0;
 static MultiXactOffset set_mxoff = (MultiXactOffset) -1;
+static bool set_mxoff__is_defined = false;
 static TimeLineID minXlogTli = 0;
 static XLogSegNo minXlogSegNo = 0;
 static int	WalSegSz;
@@ -273,8 +274,20 @@ main(int argc, char *argv[])
 					pg_log_error_hint("Try \"%s --help\" for more information.", progname);
 					exit(1);
 				}
-				if (set_mxoff == -1)
-					pg_fatal("multitransaction offset (-O) must not be -1");
+				/*
+					[2025-02-08] set_mxoff it is next-multixact-offset.
+
+					Server can do this thing equal -1 (4294967295). It is a valid value.
+
+					Zero value is valid, too. Although server should avoid this case.
+
+					This verification does not allow pg_upgrade to process a situation with (-1).
+
+					if (set_mxoff == -1)
+						pg_fatal("multitransaction offset (-O) must not be -1");
+				*/
+
+				set_mxoff__is_defined = true;
 				break;
 
 			case 'l':
@@ -463,7 +476,7 @@ main(int argc, char *argv[])
 		ControlFile.checkPointCopy.oldestMultiDB = InvalidOid;
 	}
 
-	if (set_mxoff != -1)
+	if (set_mxoff__is_defined)
 		ControlFile.checkPointCopy.nextMultiOffset = set_mxoff;
 
 	if (minXlogTli > ControlFile.checkPointCopy.ThisTimeLineID)
@@ -831,7 +844,7 @@ PrintNewControlValues(void)
 			   ControlFile.checkPointCopy.oldestMultiDB);
 	}
 
-	if (set_mxoff != -1)
+	if (set_mxoff__is_defined)
 	{
 		printf(_("NextMultiOffset:                      %u\n"),
 			   ControlFile.checkPointCopy.nextMultiOffset);
