@@ -825,6 +825,7 @@ StoreQueryTuple(const PGresult *result)
 			{
 				pg_log_warning("attempt to \\gset into specially treated variable \"%s\" ignored",
 							   varname);
+				free(varname);
 				continue;
 			}
 
