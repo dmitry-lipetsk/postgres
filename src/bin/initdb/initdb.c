@@ -1609,8 +1609,12 @@ bootstrap_template1(void)
 		pg_free(tmp);
 	}
 
-	bki_lines = replace_token(bki_lines, "ENCODING",
-							  encodingid_to_string(encodingid));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "ENCODING",
+								  (tmp = encodingid_to_string(encodingid)));
+		pg_free(tmp);
+	}
 
 	{
 		char *tmp = NULL;
