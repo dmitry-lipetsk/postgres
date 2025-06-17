@@ -1979,6 +1979,7 @@ exec_command_gset(PsqlScanState scan_state, bool active_branch)
 
 		if (PQpipelineStatus(pset.db) != PQ_PIPELINE_OFF)
 		{
+			free(prefix);
 			pg_log_error("\\%s not allowed in pipeline mode", "gset");
 			clean_extended_state();
 			return PSQL_CMD_ERROR;
