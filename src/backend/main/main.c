@@ -58,6 +58,7 @@ static const char *const DispatchOptionNames[] =
 StaticAssertDecl(lengthof(DispatchOptionNames) == DISPATCH_POSTMASTER,
 				 "array length mismatch");
 
+static void cleanup_main_data(void);
 static void startup_hacks(const char *progname);
 static void init_locale(const char *categoryname, int category, const char *locale);
 static void help(const char *progname);
@@ -74,6 +75,12 @@ main(int argc, char *argv[])
 	DispatchOption dispatch_option = DISPATCH_POSTMASTER;
 
 	reached_main = true;
+
+	/*
+	 * Setup cleanup function.
+	 */
+	if (atexit(cleanup_main_data) != 0)
+		return 1;
 
 	/*
 	 * If supported on the current platform, set up a handler to be called if
@@ -264,6 +271,16 @@ parse_dispatch_option(const char *name)
 	/* no match means this is a postmaster */
 	return DISPATCH_POSTMASTER;
 }
+
+/*
+* Cleanup global data
+*/
+static void
+cleanup_main_data(void)
+{
+	free_memblocks();
+}
+
 
 /*
  * Place platform-specific startup hacks here.  This is the right

@@ -100,6 +100,72 @@ static void flush_ps_display(void);
 static int	save_argc;
 static char **save_argv;
 
+struct tag_memblock
+{
+	struct tag_memblock* next;
+};
+
+static size_t g_mem_block_count = 0;
+struct tag_memblock* g_mem_blocks = NULL;
+
+static void* mem__malloc(size_t sz)
+{
+	size_t const sz2 = sizeof(struct tag_memblock) + sz;
+
+	void* const pv = malloc(sz2);
+
+	if (!pv)
+		return NULL;
+
+	((struct tag_memblock*)pv)->next = g_mem_blocks;
+
+	g_mem_blocks = ((struct tag_memblock*)pv);
+
+	++g_mem_block_count;
+
+	return ((char*)pv) + sizeof(struct tag_memblock);
+}
+
+static void* mem__strdup(const char* str)
+{
+	Assert(str != NULL);
+
+	{
+		size_t const sz = strlen(str) + 1;
+
+		void* const pv = mem__malloc(sz);
+
+		if (!pv)
+			return NULL;
+
+		memcpy(pv, str, sz);
+
+		return pv;
+	}
+}
+
+
+/*
+* Free memblocks
+*/
+void free_memblocks(void)
+{
+	while (g_mem_blocks != NULL)
+	{
+		struct tag_memblock * const p = (struct tag_memblock*)(g_mem_blocks);
+
+		g_mem_blocks = p->next;
+
+		Assert(g_mem_block_count > 0);
+
+		free(p);
+
+		--g_mem_block_count;
+	}
+
+	Assert(g_mem_block_count == 0);
+}
+
 
 /*
  * Call this early in startup to save the original argc/argv values.
@@ -189,7 +255,7 @@ save_ps_display_args(int argc, char **argv)
 		/*
 		 * move the environment out of the way
 		 */
-		new_environ = (char **) malloc((i + 1) * sizeof(char *));
+		new_environ = (char **) mem__malloc((i + 1) * sizeof(char *));
 		if (!new_environ)
 		{
 			write_stderr("out of memory\n");
@@ -197,7 +263,7 @@ save_ps_display_args(int argc, char **argv)
 		}
 		for (i = 0; environ[i] != NULL; i++)
 		{
-			new_environ[i] = strdup(environ[i]);
+			new_environ[i] = mem__strdup(environ[i]);
 			if (!new_environ[i])
 			{
 				write_stderr("out of memory\n");
@@ -224,7 +290,7 @@ save_ps_display_args(int argc, char **argv)
 		char	  **new_argv;
 		int			i;
 
-		new_argv = (char **) malloc((argc + 1) * sizeof(char *));
+		new_argv = (char **) mem__malloc((argc + 1) * sizeof(char *));
 		if (!new_argv)
 		{
 			write_stderr("out of memory\n");
@@ -232,7 +298,7 @@ save_ps_display_args(int argc, char **argv)
 		}
 		for (i = 0; i < argc; i++)
 		{
-			new_argv[i] = strdup(argv[i]);
+			new_argv[i] = mem__strdup(argv[i]);
 			if (!new_argv[i])
 			{
 				write_stderr("out of memory\n");
