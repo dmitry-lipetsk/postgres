@@ -554,6 +554,7 @@ exec_command_bind_named(PsqlScanState scan_state, bool active_branch,
 		}
 		else
 		{
+			Assert(pset.stmtName == NULL);
 			pset.stmtName = opt;
 			pset.send_mode = PSQL_SEND_EXTENDED_QUERY_PREPARED;
 
@@ -749,6 +750,7 @@ exec_command_close(PsqlScanState scan_state, bool active_branch, const char *cmd
 		}
 		else
 		{
+			Assert(pset.stmtName == NULL);
 			pset.stmtName = opt;
 			pset.send_mode = PSQL_SEND_EXTENDED_CLOSE;
 			status = PSQL_CMD_SEND;
@@ -2503,6 +2505,7 @@ exec_command_parse(PsqlScanState scan_state, bool active_branch,
 		}
 		else
 		{
+			Assert(pset.stmtName == NULL);
 			pset.stmtName = opt;
 			pset.send_mode = PSQL_SEND_EXTENDED_PARSE;
 			status = PSQL_CMD_SEND;
