@@ -2012,6 +2012,7 @@ set_info_version(void)
 		micro = strtol(endptr + 1, &endptr, 10);
 	snprintf(infoversion, sizeof(infoversion), "%02ld.%02ld.%04ld%s",
 			 major, minor, micro, letterversion);
+	pg_free(vstr);
 }
 
 /*
