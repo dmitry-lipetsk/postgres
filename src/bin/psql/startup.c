@@ -6,6 +6,7 @@
  * src/bin/psql/startup.c
  */
 #include "postgres_fe.h"
+#include "relaxmem.h"
 
 #ifndef WIN32
 #include <unistd.h>
@@ -77,74 +78,6 @@ struct adhoc_opts
 	SimpleActionList actions;
 };
 
-struct tag_memblock
-{
-	struct tag_memblock* next;
-};
-
-static size_t g_mem_block_count = 0;
-struct tag_memblock* g_mem_blocks = NULL;
-
-static void* mem__malloc(size_t sz)
-{
-	size_t const sz2 = sizeof(struct tag_memblock) + sz;
-
-	void* const pv = malloc(sz2);
-
-	if (!pv)
-		return NULL;
-
-	((struct tag_memblock*)pv)->next = g_mem_blocks;
-
-	g_mem_blocks = ((struct tag_memblock*)pv);
-
-	++g_mem_block_count;
-
-	return ((char*)pv) + sizeof(struct tag_memblock);
-}
-
-#define mem__malloc_object(type) ((type *) mem__malloc(sizeof(type)))
-
-static void* mem__strdup(const char* str)
-{
-	Assert(str != NULL);
-
-	{
-		size_t const sz = strlen(str) + 1;
-
-		void* const pv = mem__malloc(sz);
-
-		if (!pv)
-			return NULL;
-
-		memcpy(pv, str, sz);
-
-		return pv;
-	}
-}
-
-
-/*
-* Free memblocks
-*/
-static void free_memblocks(void)
-{
-	while (g_mem_blocks != NULL)
-	{
-		struct tag_memblock * const p = (struct tag_memblock*)(g_mem_blocks);
-
-		g_mem_blocks = p->next;
-
-		Assert(g_mem_block_count > 0);
-
-		free(p);
-
-		--g_mem_block_count;
-	}
-
-	Assert(g_mem_block_count == 0);
-}
-
 
 static void parse_psql_options(int argc, char *argv[],
 							   struct adhoc_opts *options);
@@ -192,7 +125,17 @@ empty_signal_handler(SIGNAL_ARGS)
 static void
 cleanup_main_data(void)
 {
-	free_memblocks();
+	/*
+	* Check an expected final state.
+	*
+	* We won't call clean_extended_state()
+	*/
+	Assert(pset.stmtName == NULL);
+	Assert(pset.bind_nparams == 0);
+	Assert(pset.bind_params == NULL);
+	Assert(pset.gset_prefix == NULL);
+
+	relaxmem__cleanup();
 }
 
 
@@ -643,7 +586,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 											  optarg);
 				break;
 			case 'd':
-				options->dbname = pg_strdup(optarg);
+				options->dbname = relaxmem__pg_strdup(optarg);
 				break;
 			case 'e':
 				SetVariable(pset.vars, "ECHO", "queries");
@@ -840,12 +783,12 @@ simple_action_list_append(SimpleActionList *list,
 {
 	SimpleActionListCell *cell;
 
-	cell = mem__malloc_object(SimpleActionListCell);
+	cell = relaxmem__pg_malloc_object(SimpleActionListCell);
 
 	cell->next = NULL;
 	cell->action = action;
 	if (val)
-		cell->val = mem__strdup(val);
+		cell->val = relaxmem__pg_strdup(val);
 	else
 		cell->val = NULL;
 

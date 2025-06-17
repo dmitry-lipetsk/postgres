@@ -37,6 +37,7 @@ OBJS = \
 	mainloop.o \
 	prompt.o \
 	psqlscanslash.o \
+	relaxmem.o \
 	sql_help.o \
 	startup.o \
 	stringutils.o \

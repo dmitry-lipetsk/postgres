@@ -12,6 +12,7 @@
  * src/bin/psql/describe.c
  */
 #include "postgres_fe.h"
+#include "relaxmem.h"
 
 #include <ctype.h>
 
@@ -1737,16 +1738,16 @@ describeOneTableDetails(const char *schemaname,
 	tableinfo.forcerowsecurity = strcmp(PQgetvalue(res, 0, 6), "t") == 0;
 	tableinfo.hasoids = strcmp(PQgetvalue(res, 0, 7), "t") == 0;
 	tableinfo.ispartition = strcmp(PQgetvalue(res, 0, 8), "t") == 0;
-	tableinfo.reloptions = pg_strdup(PQgetvalue(res, 0, 9));
+	tableinfo.reloptions = relaxmem__pg_strdup(PQgetvalue(res, 0, 9));
 	tableinfo.tablespace = atooid(PQgetvalue(res, 0, 10));
 	tableinfo.reloftype = (strcmp(PQgetvalue(res, 0, 11), "") != 0) ?
-		pg_strdup(PQgetvalue(res, 0, 11)) : NULL;
+		relaxmem__pg_strdup(PQgetvalue(res, 0, 11)) : NULL;
 	tableinfo.relpersistence = *(PQgetvalue(res, 0, 12));
 	tableinfo.relreplident = (pset.sversion >= 90400) ?
 		*(PQgetvalue(res, 0, 13)) : 'd';
 	if (pset.sversion >= 120000)
 		tableinfo.relam = PQgetisnull(res, 0, 14) ?
-			NULL : pg_strdup(PQgetvalue(res, 0, 14));
+			NULL : relaxmem__pg_strdup(PQgetvalue(res, 0, 14));
 	else
 		tableinfo.relam = NULL;
 	PQclear(res);
