@@ -2627,32 +2627,12 @@ clean_extended_state(void)
 {
 	int			i;
 
-	switch (pset.send_mode)
-	{
-		case PSQL_SEND_EXTENDED_CLOSE:	/* \close */
-			free(pset.stmtName);
-			break;
-		case PSQL_SEND_EXTENDED_PARSE:	/* \parse */
-			free(pset.stmtName);
-			break;
-		case PSQL_SEND_EXTENDED_QUERY_PARAMS:	/* \bind */
-		case PSQL_SEND_EXTENDED_QUERY_PREPARED: /* \bind_named */
-			for (i = 0; i < pset.bind_nparams; i++)
-				free(pset.bind_params[i]);
-			free(pset.bind_params);
-			free(pset.stmtName);
-			pset.bind_params = NULL;
-			break;
-		case PSQL_SEND_QUERY:
-		case PSQL_SEND_START_PIPELINE_MODE: /* \startpipeline */
-		case PSQL_SEND_END_PIPELINE_MODE:	/* \endpipeline */
-		case PSQL_SEND_PIPELINE_SYNC:	/* \syncpipeline */
-		case PSQL_SEND_FLUSH:	/* \flush */
-		case PSQL_SEND_GET_RESULTS: /* \getresults */
-		case PSQL_SEND_FLUSH_REQUEST:	/* \flushrequest */
-			break;
-	}
-
+	for (i = 0; i < pset.bind_nparams; i++)
+		free(pset.bind_params[i]);
+	free(pset.bind_params);
+	free(pset.stmtName);
+	pset.bind_nparams = 0;
+	pset.bind_params = NULL;
 	pset.stmtName = NULL;
 	pset.send_mode = PSQL_SEND_QUERY;
 }
