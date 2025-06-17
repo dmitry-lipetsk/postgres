@@ -537,7 +537,11 @@ replace_guc_value(char **lines, const char *guc_name, const char *guc_value,
 		appendPQExpBufferChar(newline, '#');
 	appendPQExpBuffer(newline, "%s = ", guc_name);
 	if (guc_value_requires_quotes(guc_value))
-		appendPQExpBuffer(newline, "'%s'", escape_quotes(guc_value));
+	{
+		char *tmp = NULL;
+		appendPQExpBuffer(newline, "'%s'", (tmp = escape_quotes(guc_value)));
+		free(tmp);
+	}
 	else
 		appendPQExpBufferStr(newline, guc_value);
 
@@ -1653,8 +1657,12 @@ setup_auth(FILE *cmdfd)
 	PG_CMD_PUTS("REVOKE ALL ON pg_authid FROM public;\n\n");
 
 	if (superuser_password)
+	{
+		char *tmp = NULL;
 		PG_CMD_PRINTF("ALTER USER \"%s\" WITH PASSWORD E'%s';\n\n",
-					  username, escape_quotes(superuser_password));
+					  username, (tmp = escape_quotes(superuser_password)));
+		pg_free(tmp);
+	}
 }
 
 /*
@@ -1810,6 +1818,7 @@ setup_collation(FILE *cmdfd)
 static void
 setup_privileges(FILE *cmdfd)
 {
+	char *tmp = NULL;
 	PG_CMD_PRINTF("UPDATE pg_class "
 				  "  SET relacl = (SELECT array_agg(a.acl) FROM "
 				  " (SELECT E'=r/\"%s\"' as acl "
@@ -1821,7 +1830,8 @@ setup_privileges(FILE *cmdfd)
 				  CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
 				  CppAsString2(RELKIND_SEQUENCE) ")"
 				  "  AND relacl IS NULL;\n\n",
-				  escape_quotes(username));
+				  (tmp = escape_quotes(username)));
+	free(tmp); tmp = NULL;
 	PG_CMD_PUTS("GRANT USAGE ON SCHEMA pg_catalog, public TO PUBLIC;\n\n");
 	PG_CMD_PUTS("REVOKE ALL ON pg_largeobject FROM PUBLIC;\n\n");
 	PG_CMD_PUTS("INSERT INTO pg_init_privs "
@@ -1978,6 +1988,8 @@ set_info_version(void)
 static void
 setup_schema(FILE *cmdfd)
 {
+	char *tmp = NULL;
+
 	setup_run_file(cmdfd, info_schema_file);
 
 	PG_CMD_PRINTF("UPDATE information_schema.sql_implementation_info "
@@ -1989,7 +2001,8 @@ setup_schema(FILE *cmdfd)
 				  "  (feature_id, feature_name, sub_feature_id, "
 				  "  sub_feature_name, is_supported, comments) "
 				  " FROM E'%s';\n\n",
-				  escape_quotes(features_file));
+				  (tmp = escape_quotes(features_file)));
+	free(tmp);
 }
 
 /*
