@@ -12,7 +12,6 @@
  * src/bin/psql/describe.c
  */
 #include "postgres_fe.h"
-#include "relaxmem.h"
 
 #include <ctype.h>
 
@@ -31,6 +30,7 @@
 #include "catalog/pg_type_d.h"
 #include "common.h"
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "describe.h"
 #include "fe_utils/mbprint.h"
 #include "fe_utils/print.h"

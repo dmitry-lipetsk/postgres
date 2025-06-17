@@ -6,7 +6,6 @@
  * src/bin/psql/startup.c
  */
 #include "postgres_fe.h"
-#include "relaxmem.h"
 
 #ifndef WIN32
 #include <unistd.h>
@@ -18,6 +17,7 @@
 #include "command.h"
 #include "common.h"
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "common/string.h"
 #include "describe.h"
 #include "fe_utils/print.h"

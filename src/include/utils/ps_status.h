@@ -21,8 +21,6 @@
 
 extern PGDLLIMPORT bool update_process_title;
 
-extern void free_memblocks(void);
-
 extern char **save_ps_display_args(int argc, char **argv);
 
 extern void init_ps_display(const char *fixed_part);

@@ -1,10 +1,19 @@
-#include "relaxmem.h"
+#include "common/relaxmem.h"
+#ifdef FRONTEND
 #include "postgres_fe.h"
+#endif
+#include "c.h"
+
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 enum memkind_t
 {
 	memkind_STD = 0,
+#ifdef FRONTEND
 	memkind_PG = 1,
+#endif
 };
 
 struct tag_memblock
@@ -14,7 +23,9 @@ struct tag_memblock
 };
 
 static size_t g_mem_block_count__STD = 0;
+#ifdef FRONTEND
 static size_t g_mem_block_count__PG = 0;
+#endif
 
 struct tag_memblock* g_mem_blocks = NULL;
 
@@ -55,6 +66,8 @@ void* relaxmem__strdup(const char* str)
 	}
 }
 
+#ifdef FRONTEND
+
 void* relaxmem__pg_malloc(size_t sz)
 {
 	size_t const sz2 = sizeof(struct tag_memblock) + sz;
@@ -92,6 +105,8 @@ void* relaxmem__pg_strdup(const char* str)
 	}
 }
 
+#endif
+
 void relaxmem__cleanup(void)
 {
 	while (g_mem_blocks != NULL)
@@ -106,6 +121,7 @@ void relaxmem__cleanup(void)
 			free(p);
 			--g_mem_block_count__STD;
 		}
+#ifdef FRONTEND
 		else
 		if (p->kind == memkind_PG)
 		{
@@ -113,6 +129,7 @@ void relaxmem__cleanup(void)
 			pg_free(p);
 			--g_mem_block_count__PG;
 		}
+#endif
 		else
 		{
 			Assert(false);
@@ -120,6 +137,8 @@ void relaxmem__cleanup(void)
 	}
 
 	Assert(g_mem_block_count__STD == 0);
+#ifdef FRONTEND
 	Assert(g_mem_block_count__PG == 0);
+#endif
 }
 

@@ -31,6 +31,7 @@
 #endif
 
 #include "bootstrap/bootstrap.h"
+#include "common/relaxmem.h"
 #include "common/username.h"
 #include "miscadmin.h"
 #include "postmaster/postmaster.h"
@@ -278,7 +279,7 @@ parse_dispatch_option(const char *name)
 static void
 cleanup_main_data(void)
 {
-	free_memblocks();
+	relaxmem__cleanup();
 }
 
 

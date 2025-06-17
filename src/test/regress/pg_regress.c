@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "common/restricted_token.h"
 #include "common/username.h"
 #include "getopt_long.h"
@@ -139,75 +140,6 @@ static bool postmaster_running = false;
 
 static int	success_count = 0;
 static int	fail_count = 0;
-
-struct tag_memblock
-{
-	struct tag_memblock* next;
-};
-
-static size_t g_mem_block_count = 0;
-struct tag_memblock* g_mem_blocks = NULL;
-
-static void* mem__malloc(size_t sz)
-{
-	size_t const sz2 = sizeof(struct tag_memblock) + sz;
-
-	void* const pv = malloc(sz2);
-
-	if (!pv)
-		return NULL;
-
-	((struct tag_memblock*)pv)->next = g_mem_blocks;
-
-	g_mem_blocks = ((struct tag_memblock*)pv);
-
-	++g_mem_block_count;
-
-	return ((char*)pv) + sizeof(struct tag_memblock);
-}
-
-#define mem__malloc_object(type) ((type *) mem__malloc(sizeof(type)))
-
-static void* mem__strdup(const char* str)
-{
-	Assert(str != NULL);
-
-	{
-		size_t const sz = strlen(str) + 1;
-
-		void* const pv = mem__malloc(sz);
-
-		if (!pv)
-			return NULL;
-
-		memcpy(pv, str, sz);
-
-		return pv;
-	}
-}
-
-
-/*
-* Free memblocks
-*/
-static void free_memblocks(void)
-{
-	while (g_mem_blocks != NULL)
-	{
-		struct tag_memblock * const p = (struct tag_memblock*)(g_mem_blocks);
-
-		g_mem_blocks = p->next;
-
-		Assert(g_mem_block_count > 0);
-
-		free(p);
-
-		--g_mem_block_count;
-	}
-
-	Assert(g_mem_block_count == 0);
-}
-
 
 static bool directory_exists(const char *dir);
 static void make_directory(const char *dir);
@@ -2140,7 +2072,7 @@ help(void)
 static void
 cleanup_main_data(void)
 {
-	free_memblocks();
+	relaxmem__cleanup();
 }
 
 
@@ -2245,7 +2177,7 @@ regression_main(int argc, char *argv[],
 				debug = true;
 				break;
 			case 3:
-				inputdir = mem__strdup(optarg);
+				inputdir = relaxmem__pg_strdup(optarg);
 				break;
 			case 5:
 				max_connections = atoi(optarg);
@@ -2283,7 +2215,7 @@ regression_main(int argc, char *argv[],
 					bindir = NULL;
 				break;
 			case 17:
-				dlpath = mem__strdup(optarg);
+				dlpath = relaxmem__pg_strdup(optarg);
 				break;
 			case 18:
 				split_to_stringlist(optarg, ",", &extraroles);
