@@ -77,6 +77,75 @@ struct adhoc_opts
 	SimpleActionList actions;
 };
 
+struct tag_memblock
+{
+	struct tag_memblock* next;
+};
+
+static size_t g_mem_block_count = 0;
+struct tag_memblock* g_mem_blocks = NULL;
+
+static void* mem__malloc(size_t sz)
+{
+	size_t const sz2 = sizeof(struct tag_memblock) + sz;
+
+	void* const pv = malloc(sz2);
+
+	if (!pv)
+		return NULL;
+
+	((struct tag_memblock*)pv)->next = g_mem_blocks;
+
+	g_mem_blocks = ((struct tag_memblock*)pv);
+
+	++g_mem_block_count;
+
+	return ((char*)pv) + sizeof(struct tag_memblock);
+}
+
+#define mem__malloc_object(type) ((type *) mem__malloc(sizeof(type)))
+
+static void* mem__strdup(const char* str)
+{
+	Assert(str != NULL);
+
+	{
+		size_t const sz = strlen(str) + 1;
+
+		void* const pv = mem__malloc(sz);
+
+		if (!pv)
+			return NULL;
+
+		memcpy(pv, str, sz);
+
+		return pv;
+	}
+}
+
+
+/*
+* Free memblocks
+*/
+static void free_memblocks(void)
+{
+	while (g_mem_blocks != NULL)
+	{
+		struct tag_memblock * const p = (struct tag_memblock*)(g_mem_blocks);
+
+		g_mem_blocks = p->next;
+
+		Assert(g_mem_block_count > 0);
+
+		free(p);
+
+		--g_mem_block_count;
+	}
+
+	Assert(g_mem_block_count == 0);
+}
+
+
 static void parse_psql_options(int argc, char *argv[],
 							   struct adhoc_opts *options);
 static void simple_action_list_append(SimpleActionList *list,
@@ -118,6 +187,16 @@ empty_signal_handler(SIGNAL_ARGS)
 #endif
 
 /*
+* Cleanup global data
+*/
+static void
+cleanup_main_data(void)
+{
+	free_memblocks();
+}
+
+
+/*
  *
  * main
  *
@@ -129,6 +208,12 @@ main(int argc, char *argv[])
 	int			successResult;
 	char	   *password = NULL;
 	bool		new_pass;
+
+	/*
+	 * Setup cleanup function.
+	 */
+	if (atexit(cleanup_main_data) != 0)
+		return 1;
 
 	pg_logging_init(argv[0]);
 	pg_logging_set_pre_callback(log_pre_callback);
@@ -755,12 +840,12 @@ simple_action_list_append(SimpleActionList *list,
 {
 	SimpleActionListCell *cell;
 
-	cell = pg_malloc_object(SimpleActionListCell);
+	cell = mem__malloc_object(SimpleActionListCell);
 
 	cell->next = NULL;
 	cell->action = action;
 	if (val)
-		cell->val = pg_strdup(val);
+		cell->val = mem__strdup(val);
 	else
 		cell->val = NULL;
 
