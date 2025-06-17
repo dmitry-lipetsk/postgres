@@ -1361,11 +1361,19 @@ setup_config(void)
 								  dynamic_shared_memory_type, false);
 
 	/* Caution: these depend on wal_segment_size_mb, they're not constants */
-	conflines = replace_guc_value(conflines, "min_wal_size",
-								  pretty_wal_size(DEFAULT_MIN_WAL_SEGS), false);
+	{
+		char *tmp = NULL;
+		conflines = replace_guc_value(conflines, "min_wal_size",
+									  (tmp = pretty_wal_size(DEFAULT_MIN_WAL_SEGS)), false);
+		pg_free(tmp);
+	}
 
-	conflines = replace_guc_value(conflines, "max_wal_size",
-								  pretty_wal_size(DEFAULT_MAX_WAL_SEGS), false);
+	{
+		char *tmp = NULL;
+		conflines = replace_guc_value(conflines, "max_wal_size",
+									  (tmp = pretty_wal_size(DEFAULT_MAX_WAL_SEGS)), false);
+		pg_free(tmp);
+	}
 
 	/*
 	 * Fix up various entries to match the true compile-time defaults.  Since
