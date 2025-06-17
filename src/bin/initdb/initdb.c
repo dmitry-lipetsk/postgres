@@ -1493,8 +1493,15 @@ setup_config(void)
 		hints.ai_addr = NULL;
 		hints.ai_next = NULL;
 
-		if (err != 0 ||
-			getaddrinfo("::1", NULL, &hints, &gai_result) != 0)
+		if (err == 0)
+		{			
+		}
+		else
+		if (getaddrinfo("::1", NULL, &hints, &gai_result) == 0)
+		{
+			freeaddrinfo(gai_result);
+		}
+		else
 		{
 			conflines = replace_token(conflines,
 									  "host    all             all             ::1",
