@@ -1602,23 +1602,43 @@ bootstrap_template1(void)
 	bki_lines = replace_token(bki_lines, "FLOAT8PASSBYVAL",
 							  FLOAT8PASSBYVAL ? "true" : "false");
 
-	bki_lines = replace_token(bki_lines, "POSTGRES",
-							  escape_quotes_bki(username));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "POSTGRES",
+								  (tmp = escape_quotes_bki(username)));
+		pg_free(tmp);
+	}
 
 	bki_lines = replace_token(bki_lines, "ENCODING",
 							  encodingid_to_string(encodingid));
 
-	bki_lines = replace_token(bki_lines, "LC_COLLATE",
-							  escape_quotes_bki(lc_collate));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "LC_COLLATE",
+								  (tmp = escape_quotes_bki(lc_collate)));
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "LC_CTYPE",
-							  escape_quotes_bki(lc_ctype));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "LC_CTYPE",
+								  (tmp = escape_quotes_bki(lc_ctype)));
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "DATLOCALE",
-							  datlocale ? escape_quotes_bki(datlocale) : "_null_");
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "DATLOCALE",
+								  datlocale ? (tmp = escape_quotes_bki(datlocale)) : "_null_");
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "ICU_RULES",
-							  icu_rules ? escape_quotes_bki(icu_rules) : "_null_");
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "ICU_RULES",
+								  icu_rules ? (tmp = escape_quotes_bki(icu_rules)) : "_null_");
+		pg_free(tmp);
+	}
 
 	sprintf(buf, "%c", locale_provider);
 	bki_lines = replace_token(bki_lines, "LOCALE_PROVIDER", buf);
