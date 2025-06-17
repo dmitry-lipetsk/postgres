@@ -1926,11 +1926,13 @@ exec_command_getresults(PsqlScanState scan_state, bool active_branch)
 			num_results = atoi(opt);
 			if (num_results < 0)
 			{
+				free(opt);
 				pg_log_error("\\getresults: invalid number of requested results");
 				return PSQL_CMD_ERROR;
 			}
 			pset.requested_results = num_results;
 		}
+		free(opt);
 	}
 	else
 		ignore_slash_options(scan_state);
