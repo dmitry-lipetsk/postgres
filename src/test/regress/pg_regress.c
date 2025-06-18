@@ -1890,6 +1890,9 @@ run_single_test(const char *test, test_start_function startfunc,
 		differ |= newdiff;
 	}
 
+	free_stringlist(&resultfiles);
+	free_stringlist(&expectfiles);
+
 	INSTR_TIME_SUBTRACT(stoptime, starttime);
 
 	if (exit_status != 0)
