@@ -2189,7 +2189,7 @@ regression_main(int argc, char *argv[],
 				encoding = pg_strdup(optarg);
 				break;
 			case 7:
-				outputdir = pg_strdup(optarg);
+				outputdir = relaxmem__pg_strdup(optarg);
 				break;
 			case 8:
 				add_stringlist_item(&schedulelist, optarg);
