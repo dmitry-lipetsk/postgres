@@ -201,8 +201,11 @@ main(int argc, char **argv)
 		{
 			fprintf(stderr, "setting of application name failed: %s",
 					PQerrorMessage(conns[i].conn));
+			PQclear(res);
 			exit(1);
 		}
+
+		PQclear(res);
 
 		/* Save each connection's backend PID for subsequent use. */
 		conns[i].backend_pid = PQbackendPID(conns[i].conn);
