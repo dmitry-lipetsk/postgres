@@ -1,5 +1,7 @@
 #include "common/relaxmem.h"
-#ifdef FRONTEND
+#ifndef FRONTEND
+#include "postgres.h"
+#else
 #include "postgres_fe.h"
 #endif
 #include "c.h"
@@ -13,6 +15,7 @@ enum memkind_t
 	memkind_STD = 0,
 #ifdef FRONTEND
 	memkind_PG = 1,
+	memkind_P = 2,
 #endif
 };
 
@@ -25,6 +28,7 @@ struct tag_memblock
 static size_t g_mem_block_count__STD = 0;
 #ifdef FRONTEND
 static size_t g_mem_block_count__PG = 0;
+static size_t g_mem_block_count__P = 0;
 #endif
 
 struct tag_memblock* g_mem_blocks = NULL;
@@ -120,6 +124,53 @@ void* relaxmem__pg_strdup(const char* str)
 	}
 }
 
+void* relaxmem__palloc(size_t sz)
+{
+	size_t const sz2 = sizeof(struct tag_memblock) + sz;
+
+	void* const pv = palloc(sz2);
+
+	if (!pv)
+		return NULL;
+
+	((struct tag_memblock*)pv)->kind = memkind_P;
+
+	return reg_memblock_and_return_ptr(
+		((struct tag_memblock*)pv), &g_mem_block_count__P);
+}
+
+void* relaxmem__pstrdup(const char* str)
+{
+	Assert(str != NULL);
+
+	{
+		size_t const sz = strlen(str) + 1;
+
+		void* const pv = relaxmem__palloc(sz);
+
+		if (!pv)
+			return NULL;
+
+		memcpy(pv, str, sz);
+
+		return pv;
+	}
+}
+
+#else
+
+/* FRONTEND is not defined */
+
+void* relaxmem__palloc(size_t sz)
+{
+	return palloc(sz);
+}
+
+void* relaxmem__pstrdup(const char* str)
+{
+	return pstrdup(str);
+}
+
 #endif
 
 void relaxmem__cleanup(void)
@@ -144,6 +195,13 @@ void relaxmem__cleanup(void)
 			pg_free(p);
 			--g_mem_block_count__PG;
 		}
+		else
+		if (p->kind == memkind_P)
+		{
+			Assert(g_mem_block_count__P > 0);
+			pfree(p);
+			--g_mem_block_count__P;
+		}
 #endif
 		else
 		{
@@ -154,6 +212,7 @@ void relaxmem__cleanup(void)
 	Assert(g_mem_block_count__STD == 0);
 #ifdef FRONTEND
 	Assert(g_mem_block_count__PG == 0);
+	Assert(g_mem_block_count__P == 0);
 #endif
 }
 
