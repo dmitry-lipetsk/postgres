@@ -1364,7 +1364,7 @@ ReceiveArchiveStream(PGconn *conn, pg_compress_specification *compress)
 		astreamer_free(state.streamer);
 		state.streamer = NULL;
 	}
-	
+
 	Assert(ReceiveArchiveStream_pstate == &state);
 	ReceiveArchiveStream_pstate = NULL;
 }
