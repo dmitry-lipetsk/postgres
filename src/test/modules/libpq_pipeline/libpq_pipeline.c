@@ -430,7 +430,11 @@ test_disallowed_in_pipeline(PGconn *conn)
 	/* PQexec should fail in pipeline mode */
 	res = PQexec(conn, "SELECT 1");
 	if (PQresultStatus(res) != PGRES_FATAL_ERROR)
+	{
+		PQclear(res);
 		pg_fatal("PQexec should fail in pipeline mode but succeeded");
+	}
+	PQclear(res); res = NULL;
 	if (strcmp(PQerrorMessage(conn),
 			   "synchronous command execution functions are not allowed in pipeline mode\n") != 0)
 		pg_fatal("did not get expected error message; got: \"%s\"",
@@ -465,8 +469,12 @@ test_disallowed_in_pipeline(PGconn *conn)
 	/* can now PQexec again */
 	res = PQexec(conn, "SELECT 1");
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
+	{
+		PQclear(res);
 		pg_fatal("PQexec should succeed after exiting pipeline mode but failed with: %s",
 				 PQerrorMessage(conn));
+	}
+	PQclear(res);
 
 	fprintf(stderr, "ok\n");
 }
