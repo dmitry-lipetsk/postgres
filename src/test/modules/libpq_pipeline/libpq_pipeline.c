@@ -2144,17 +2144,27 @@ test_uniqviol(PGconn *conn)
 	res = PQexec(conn, "drop table if exists ppln_uniqviol;"
 				 "create table ppln_uniqviol(id bigint primary key, idata bigint)");
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
+	{
+		PQclear(res);
 		pg_fatal("failed to create table: %s", PQerrorMessage(conn));
-
+	}
+	PQclear(res);
 	res = PQexec(conn, "begin");
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
+	{
+		PQclear(res);
 		pg_fatal("failed to begin transaction: %s", PQerrorMessage(conn));
-
+	}
+	PQclear(res);
 	res = PQprepare(conn, "insertion",
 					"insert into ppln_uniqviol values ($1, $2) returning id",
 					2, paramTypes);
 	if (res == NULL || PQresultStatus(res) != PGRES_COMMAND_OK)
+	{
+		PQclear(res);
 		pg_fatal("failed to prepare query: %s", PQerrorMessage(conn));
+	}
+	PQclear(res); res = NULL;
 
 	if (PQenterPipelineMode(conn) != 1)
 		pg_fatal("failed to enter pipeline mode");
