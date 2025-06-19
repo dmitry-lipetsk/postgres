@@ -588,22 +588,34 @@ test_multi_pipelines(PGconn *conn)
 				 PQerrorMessage(conn));
 
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
-		pg_fatal("Unexpected result code %s from third pipeline item",
-				 PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Unexpected result code %s from third pipeline item", st);
+	}
+	PQclear(res);
 	res = PQgetResult(conn);
 	if (res != NULL)
-		pg_fatal("Expected null result, got %s",
-				 PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected null result, got %s", st);
+	}
+	Assert(res == NULL);
 	res = PQgetResult(conn);
 	if (res == NULL)
+	{
 		pg_fatal("PQgetResult returned null when there's a pipeline item: %s",
 				 PQerrorMessage(conn));
-
+	}
+	Assert(res != NULL);
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("Unexpected result code %s from second pipeline sync",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Unexpected result code %s from second pipeline sync", st);
+	}
+	PQclear(res); res = NULL;
 
 	/* We're still in pipeline mode ... */
 	if (PQpipelineStatus(conn) == PQ_PIPELINE_OFF)
