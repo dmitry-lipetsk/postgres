@@ -230,6 +230,10 @@ copy_connection(PGconn *conn)
 
 	copyConn = PQconnectdbParams(keywords, vals, false);
 
+	pg_free(keywords); keywords = NULL;
+	pg_free(vals); vals = NULL;
+	PQconninfoFree(opts);
+
 	if (PQstatus(copyConn) != CONNECTION_OK)
 	{
 		PQfinish(copyConn);
