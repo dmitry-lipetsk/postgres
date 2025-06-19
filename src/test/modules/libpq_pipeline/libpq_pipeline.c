@@ -97,6 +97,11 @@ run_local_cleaners(void)
 	}
 }
 
+static void PGResultPtr__cleaner(void* pv)
+{
+	PQclear((PGresult*)pv);
+}
+
 static void
 exit_nicely(PGconn *conn)
 {
@@ -1888,16 +1893,27 @@ test_singlerowmode(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("unexpected NULL");
 	if (PQresultStatus(res) != PGRES_SINGLE_TUPLE)
-		pg_fatal("Expected PGRES_SINGLE_TUPLE, got %s",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected PGRES_SINGLE_TUPLE, got %s", st);
+	}
+	PQclear(res);
 	res = PQgetResult(conn);
 	if (res == NULL)
 		pg_fatal("unexpected NULL");
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
-		pg_fatal("Expected PGRES_TUPLES_OK, got %s",
-				 PQresStatus(PQresultStatus(res)));
-	if (PQgetResult(conn) != NULL)
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected PGRES_TUPLES_OK, got %s", st);
+	}
+	PQclear(res); res = NULL;
+	if ((res = PQgetResult(conn)) != NULL)
+	{
+		PQclear(res);
 		pg_fatal("expected NULL result");
+	}
 
 	if (PQsendQueryParams(conn, "SELECT 1",
 						  0, NULL, NULL, NULL, NULL, 0) != 1)
@@ -1909,10 +1925,18 @@ test_singlerowmode(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("unexpected NULL");
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
-		pg_fatal("Expected PGRES_TUPLES_OK, got %s",
-				 PQresStatus(PQresultStatus(res)));
-	if (PQgetResult(conn) != NULL)
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected PGRES_TUPLES_OK, got %s", st);
+	}
+	PQclear(res); res = NULL;
+	if ((res = PQgetResult(conn)) != NULL)
+	{
+		PQclear(res);
 		pg_fatal("expected NULL result");
+	}
+	Assert(res == NULL);
 
 	/*
 	 * Try chunked mode as well; make sure that it correctly delivers a
@@ -1920,8 +1944,10 @@ test_singlerowmode(PGconn *conn)
 	 */
 	if (PQsendQueryParams(conn, "SELECT generate_series(1, 5)",
 						  0, NULL, NULL, NULL, NULL, 0) != 1)
+	{
 		pg_fatal("failed to send query: %s",
 				 PQerrorMessage(conn));
+	}
 	if (PQsendFlushRequest(conn) != 1)
 		pg_fatal("failed to send flush request");
 	if (PQsetChunkedRowsMode(conn, 3) != 1)
@@ -1930,29 +1956,57 @@ test_singlerowmode(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("unexpected NULL");
 	if (PQresultStatus(res) != PGRES_TUPLES_CHUNK)
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
 		pg_fatal("Expected PGRES_TUPLES_CHUNK, got %s: %s",
-				 PQresStatus(PQresultStatus(res)),
+				 st,
 				 PQerrorMessage(conn));
+	}
 	if (PQntuples(res) != 3)
+	{
+		reg_local_cleaner(PGResultPtr__cleaner, res);
 		pg_fatal("Expected 3 rows, got %d", PQntuples(res));
+		Assert(false);
+	}
+	PQclear(res);
 	res = PQgetResult(conn);
 	if (res == NULL)
 		pg_fatal("unexpected NULL");
 	if (PQresultStatus(res) != PGRES_TUPLES_CHUNK)
-		pg_fatal("Expected PGRES_TUPLES_CHUNK, got %s",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected PGRES_TUPLES_CHUNK, got %s", st);
+	}
 	if (PQntuples(res) != 2)
+	{
+		reg_local_cleaner(PGResultPtr__cleaner, res);
 		pg_fatal("Expected 2 rows, got %d", PQntuples(res));
+		Assert(false);
+	}
+	PQclear(res);
 	res = PQgetResult(conn);
 	if (res == NULL)
 		pg_fatal("unexpected NULL");
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
-		pg_fatal("Expected PGRES_TUPLES_OK, got %s",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected PGRES_TUPLES_OK, got %s", st);
+	}
 	if (PQntuples(res) != 0)
+	{
+		reg_local_cleaner(PGResultPtr__cleaner, res);
 		pg_fatal("Expected 0 rows, got %d", PQntuples(res));
-	if (PQgetResult(conn) != NULL)
+	}
+	PQclear(res); res = NULL;
+	if ((res = PQgetResult(conn)) != NULL)
+	{
+		PQclear(res);
 		pg_fatal("expected NULL result");
+	}
+	Assert(res == NULL);
 
 	if (PQexitPipelineMode(conn) != 1)
 		pg_fatal("failed to end pipeline mode: %s", PQerrorMessage(conn));
