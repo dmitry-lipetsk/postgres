@@ -1293,6 +1293,28 @@ CreateBackupStreamer(char *archive_name, char *spclocation,
 	return streamer;
 }
 
+static ArchiveStreamState* ReceiveArchiveStream_pstate = NULL;
+
+static void Cleanup__ReceiveArchiveStream_pstate(void)
+{
+	ArchiveStreamState * const tmp = ReceiveArchiveStream_pstate;
+
+	if (tmp == NULL)
+		return;
+
+	ReceiveArchiveStream_pstate = NULL;
+
+	Assert(tmp->manifest_file == NULL);
+	Assert(tmp->manifest_buffer == NULL);
+
+	if (tmp->streamer != NULL)
+	{
+		astreamer_finalize(tmp->streamer);
+		astreamer_free(tmp->streamer);
+		tmp->streamer = NULL;
+	}
+}
+
 /*
  * Receive all of the archives the server wants to send - and the backup
  * manifest if present - as a single COPY stream.
@@ -1306,6 +1328,9 @@ ReceiveArchiveStream(PGconn *conn, pg_compress_specification *compress)
 	memset(&state, 0, sizeof(state));
 	state.tablespacenum = -1;
 	state.compress = compress;
+
+	Assert(ReceiveArchiveStream_pstate == NULL);
+	ReceiveArchiveStream_pstate = &state;
 
 	/* All the real work happens in ReceiveArchiveStreamChunk. */
 	ReceiveCopyData(conn, ReceiveArchiveStreamChunk, &state);
@@ -1339,6 +1364,9 @@ ReceiveArchiveStream(PGconn *conn, pg_compress_specification *compress)
 		astreamer_free(state.streamer);
 		state.streamer = NULL;
 	}
+	
+	Assert(ReceiveArchiveStream_pstate == &state);
+	ReceiveArchiveStream_pstate = NULL;
 }
 
 /*
@@ -2387,6 +2415,7 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 static void
 cleanup_global_data(void)
 {
+	Cleanup__ReceiveArchiveStream_pstate();
 	relaxmem__cleanup();
 }
 
