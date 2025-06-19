@@ -496,19 +496,23 @@ ReceiveXlogStream(PGconn *conn, StreamCtl *stream)
 		/*
 		 * Get the server system identifier and timeline, and validate them.
 		 */
-		if (!RunIdentifySystem(conn, &sysidentifier, &servertli, NULL, NULL))
+		if (!RunIdentifySystem2(conn, &sysidentifier, &servertli, NULL, NULL))
 		{
-			pg_free(sysidentifier);
+			// relaxmem
+			// pg_free(sysidentifier);
 			return false;
 		}
 
 		if (strcmp(stream->sysidentifier, sysidentifier) != 0)
 		{
 			pg_log_error("system identifier does not match between base backup and streaming connection");
-			pg_free(sysidentifier);
+			// relaxmem
+			// pg_free(sysidentifier);
 			return false;
 		}
-		pg_free(sysidentifier);
+		
+		// relaxmem
+		// pg_free(sysidentifier);
 
 		if (stream->timeline > servertli)
 		{

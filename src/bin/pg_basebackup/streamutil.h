@@ -38,10 +38,10 @@ extern bool CreateReplicationSlot(PGconn *conn, const char *slot_name,
 								  bool slot_exists_ok, bool two_phase,
 								  bool failover);
 extern bool DropReplicationSlot(PGconn *conn, const char *slot_name);
-extern bool RunIdentifySystem(PGconn *conn, char **sysid,
-							  TimeLineID *starttli,
-							  XLogRecPtr *startpos,
-							  char **db_name);
+extern bool RunIdentifySystem2(PGconn *conn, char **sysid,
+							   TimeLineID *starttli,
+							   XLogRecPtr *startpos,
+							   char **db_name);
 
 extern void AppendPlainCommandOption(PQExpBuffer buf,
 									 bool use_new_option_syntax,

@@ -968,7 +968,7 @@ main(int argc, char **argv)
 	 * --drop-slot can remove replication slots from any replication
 	 * connection without this restriction.
 	 */
-	if (!RunIdentifySystem(conn, NULL, NULL, NULL, &db_name))
+	if (!RunIdentifySystem2(conn, NULL, NULL, NULL, &db_name))
 		exit(1);
 
 	if (!do_drop_slot && db_name == NULL)

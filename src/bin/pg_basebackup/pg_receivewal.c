@@ -528,7 +528,7 @@ StreamLog(void)
 	 * at the same time, necessary if not valid data can be found in the
 	 * existing output directory.
 	 */
-	if (!RunIdentifySystem(conn, &sysidentifier, &servertli, &serverpos, NULL))
+	if (!RunIdentifySystem2(conn, &sysidentifier, &servertli, &serverpos, NULL))
 		exit(1);
 
 	/*
@@ -848,7 +848,7 @@ main(int argc, char **argv)
 	 * replication connection and haven't connected using a database specific
 	 * connection.
 	 */
-	if (!RunIdentifySystem(conn, NULL, NULL, NULL, &db_name))
+	if (!RunIdentifySystem2(conn, NULL, NULL, NULL, &db_name))
 		exit(1);
 
 	/*

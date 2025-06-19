@@ -21,6 +21,7 @@
 #include "common/connect.h"
 #include "common/file_perm.h"
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "common/string.h"
 #include "datatype/timestamp.h"
 #include "port/pg_bswap.h"
@@ -400,14 +401,14 @@ RetrieveDataDirCreatePerm(PGconn *conn)
 /*
  * Run IDENTIFY_SYSTEM through a given connection and give back to caller
  * some result information if requested:
- * - System identifier
+ * - System identifier (relaxmem is used)
  * - Current timeline ID
  * - Start LSN position
  * - Database name (NULL in servers prior to 9.4)
  */
 bool
-RunIdentifySystem(PGconn *conn, char **sysid, TimeLineID *starttli,
-				  XLogRecPtr *startpos, char **db_name)
+RunIdentifySystem2(PGconn *conn, char **sysid, TimeLineID *starttli,
+				   XLogRecPtr *startpos, char **db_name)
 {
 	PGresult   *res;
 	uint32		hi,
@@ -436,7 +437,7 @@ RunIdentifySystem(PGconn *conn, char **sysid, TimeLineID *starttli,
 
 	/* Get system identifier */
 	if (sysid != NULL)
-		*sysid = pg_strdup(PQgetvalue(res, 0, 0));
+		*sysid = relaxmem__pg_strdup(PQgetvalue(res, 0, 0));
 
 	/* Get timeline ID to start streaming from */
 	if (starttli != NULL)

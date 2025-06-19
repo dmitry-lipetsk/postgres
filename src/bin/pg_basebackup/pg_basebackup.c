@@ -32,6 +32,7 @@
 #include "common/file_perm.h"
 #include "common/file_utils.h"
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "fe_utils/option_utils.h"
 #include "fe_utils/recovery_gen.h"
 #include "getopt_long.h"
@@ -1824,7 +1825,7 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 	/*
 	 * Run IDENTIFY_SYSTEM so we can get the timeline
 	 */
-	if (!RunIdentifySystem(conn, &sysidentifier, &latesttli, NULL, NULL))
+	if (!RunIdentifySystem2(conn, &sysidentifier, &latesttli, NULL, NULL))
 		exit(1);
 
 	/*
@@ -2352,6 +2353,13 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 }
 
 
+static void
+cleanup_global_data(void)
+{
+	relaxmem__cleanup();
+}
+
+
 int
 main(int argc, char **argv)
 {
@@ -2401,6 +2409,9 @@ main(int argc, char **argv)
 	char	   *incremental_manifest = NULL;
 	CompressionLocation compressloc = COMPRESS_LOCATION_UNSPECIFIED;
 	pg_compress_specification client_compress;
+
+	if (atexit(cleanup_global_data) != 0)
+		return 1;
 
 	pg_logging_init(argv[0]);
 	progname = get_progname(argv[0]);
