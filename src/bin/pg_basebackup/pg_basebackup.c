@@ -542,6 +542,20 @@ typedef struct
 	int			wal_compress_level;
 } logstreamer_param;
 
+static void
+logstreamer_param__destructor(void *pv)
+{
+	logstreamer_param * const This = (logstreamer_param*)pv;
+	Assert(pv != NULL);
+
+	if (This->bgconn != NULL)
+	{
+		PGconn * const bgconn = This->bgconn;
+		This->bgconn = NULL;
+		PQfinish(bgconn);
+	}
+}
+
 static int
 LogStreamerMain(logstreamer_param *param)
 {
@@ -602,6 +616,7 @@ LogStreamerMain(logstreamer_param *param)
 	}
 
 	PQfinish(param->bgconn);
+	param->bgconn = NULL;
 
 	stream.walmethod->ops->free(stream.walmethod);
 
@@ -623,7 +638,7 @@ StartLogStreamer(char *startpos, uint32 timeline, char *sysidentifier,
 				lo;
 	char		statusdir[MAXPGPATH];
 
-	param = pg_malloc0(sizeof(logstreamer_param));
+	param = (logstreamer_param*) relaxmem__pg_malloc0_with_destructor(sizeof(logstreamer_param), logstreamer_param__destructor);
 	param->timeline = timeline;
 	param->sysidentifier = sysidentifier;
 	param->wal_compress_algorithm = wal_compress_algorithm;
