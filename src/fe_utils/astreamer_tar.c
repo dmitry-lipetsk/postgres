@@ -342,6 +342,7 @@ astreamer_tar_parser_free(astreamer *streamer)
 {
 	pfree(streamer->bbs_buffer.data);
 	astreamer_free(streamer->bbs_next);
+	pfree(streamer);
 }
 
 /*
