@@ -1656,14 +1656,20 @@ test_simple_pipeline(PGconn *conn)
 				 PQerrorMessage(conn));
 
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
-		pg_fatal("Unexpected result code %s from first pipeline item",
-				 PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Unexpected result code %s from first pipeline item", st);
+	}
 	PQclear(res);
 	res = NULL;
 
-	if (PQgetResult(conn) != NULL)
+	if ((res = PQgetResult(conn)) != NULL)
+	{
+		PQclear(res);
 		pg_fatal("PQgetResult returned something extra after first query result.");
+	}
+	Assert(res == NULL);
 
 	/*
 	 * Even though we've processed the result there's still a sync to come and
@@ -1674,19 +1680,28 @@ test_simple_pipeline(PGconn *conn)
 
 	res = PQgetResult(conn);
 	if (res == NULL)
+	{
 		pg_fatal("PQgetResult returned null when sync result PGRES_PIPELINE_SYNC expected: %s",
 				 PQerrorMessage(conn));
-
+	}
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
 		pg_fatal("Unexpected result code %s instead of PGRES_PIPELINE_SYNC, error: %s",
-				 PQresStatus(PQresultStatus(res)), PQerrorMessage(conn));
-
+				 st,
+				 PQerrorMessage(conn));
+	}
 	PQclear(res);
 	res = NULL;
 
-	if (PQgetResult(conn) != NULL)
-		pg_fatal("PQgetResult returned something extra after pipeline end: %s",
-				 PQresStatus(PQresultStatus(res)));
+	if ((res = PQgetResult(conn)) != NULL)
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("PQgetResult returned something extra after pipeline end: %s", st);
+	}
+	Assert(res == NULL);
 
 	/* We're still in pipeline mode... */
 	if (PQpipelineStatus(conn) == PQ_PIPELINE_OFF)
