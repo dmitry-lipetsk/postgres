@@ -19,6 +19,7 @@
 #include <sys/time.h>
 
 #include "catalog/pg_type_d.h"
+#include "common/relaxmem.h"
 #include "libpq-fe.h"
 #include "pg_getopt.h"
 
@@ -54,6 +55,47 @@ static const char *const insert_sql2 =
 /* max char length of an int32/64, plus sign and null terminator */
 #define MAXINTLEN 12
 #define MAXINT8LEN 20
+
+struct tag_local_cleaner
+{
+	void (*cleaner)(void*);
+	void* ptr;
+};
+
+static struct tag_local_cleaner local_cleaners_list[128] ={0};
+static size_t local_cleaners_count = 0;
+
+static void reg_local_cleaner(void (*cleaner)(void*), void *pv)
+{
+	Assert(cleaner != NULL);
+	Assert(local_cleaners_count < lengthof(local_cleaners_list));
+
+	if(local_cleaners_count == lengthof(local_cleaners_list))
+		return;
+
+	{
+		const struct tag_local_cleaner c = {cleaner, pv};
+		local_cleaners_list[local_cleaners_count] = c;
+		++local_cleaners_count;
+	}
+}
+
+static void
+run_local_cleaners(void)
+{
+	const struct tag_local_cleaner z = {NULL, NULL};
+	while (local_cleaners_count !=0)
+	{
+		Assert(local_cleaners_count <= lengthof(local_cleaners_list));
+		-- local_cleaners_count;
+		{
+			const struct tag_local_cleaner c = local_cleaners_list[local_cleaners_count];
+			local_cleaners_list[local_cleaners_count] = z;
+			Assert(c.cleaner != NULL);
+			c.cleaner(c.ptr);
+		}
+	}
+}
 
 static void
 exit_nicely(PGconn *conn)
@@ -2316,6 +2358,12 @@ print_test_list(void)
 	printf("uniqviol\n");
 }
 
+static void clean_global_data(void)
+{
+	run_local_cleaners();
+	relaxmem__cleanup();
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2326,6 +2374,9 @@ main(int argc, char **argv)
 	int			numrows = 10000;
 	PGresult   *res;
 	int			c;
+
+	if (atexit(clean_global_data) != 0)
+		return 1;
 
 	while ((c = getopt(argc, argv, "r:t:")) != -1)
 	{
