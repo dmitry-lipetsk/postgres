@@ -231,8 +231,11 @@ copy_connection(PGconn *conn)
 	copyConn = PQconnectdbParams(keywords, vals, false);
 
 	if (PQstatus(copyConn) != CONNECTION_OK)
+	{
+		PQfinish(copyConn);
 		pg_fatal("Connection to database failed: %s",
 				 PQerrorMessage(copyConn));
+	}
 
 	return copyConn;
 }
