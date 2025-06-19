@@ -2007,8 +2007,12 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 
 	/* OK, try to start the backup. */
 	if (PQsendQuery(conn, basebkp) == 0)
+	{
+		pfree(basebkp);
 		pg_fatal("could not send replication command \"%s\": %s",
 				 "BASE_BACKUP", PQerrorMessage(conn));
+	}
+	pfree(basebkp); basebkp = NULL;
 
 	/*
 	 * Get the starting WAL location
