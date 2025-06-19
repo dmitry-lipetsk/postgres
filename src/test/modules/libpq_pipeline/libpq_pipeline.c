@@ -1592,7 +1592,10 @@ test_pipeline_idle(PGconn *conn)
 	PQclear(res);
 	res = PQgetResult(conn);
 	if (res != NULL)
+	{
+		PQclear(res);
 		pg_fatal("did not receive terminating NULL");
+	}
 	if (PQexitPipelineMode(conn) != 1)
 		pg_fatal("exiting pipeline failed: %s", PQerrorMessage(conn));
 
@@ -1610,7 +1613,12 @@ test_pipeline_idle(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("unexpected NULL result received");
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
-		pg_fatal("unexpected result code %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("unexpected result code %s", st);
+	}
+	PQclear(res); res = NULL;
 	if (PQexitPipelineMode(conn) != 1)
 		pg_fatal("failed to exit pipeline mode: %s", PQerrorMessage(conn));
 	fprintf(stderr, "ok - 2\n");
