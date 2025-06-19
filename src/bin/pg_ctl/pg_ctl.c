@@ -25,6 +25,7 @@
 #include "common/controldata_utils.h"
 #include "common/file_perm.h"
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "common/string.h"
 #include "getopt_long.h"
 #include "utils/pidfile.h"
@@ -112,6 +113,8 @@ static HANDLE shutdownHandles[2];
 #define postmasterProcess shutdownHandles[1]
 #endif
 
+static void* local_relaxmem_pptrs_buffer[128] = {NULL};
+static size_t local_relaxmem_pptrs_count = 0;
 
 static void write_stderr(const char *fmt,...) pg_attribute_printf(1, 2);
 static void do_advice(void);
@@ -161,6 +164,37 @@ static void unlimit_core_size(void);
 
 static DBState get_control_dbstate(void);
 
+static void reg_local_relaxmem_pptr(void* ptr)
+{
+	Assert(ptr != NULL);
+
+	if (ptr == NULL)
+		return;
+
+	Assert(local_relaxmem_pptrs_count < lengthof(local_relaxmem_pptrs_buffer));
+
+	if (local_relaxmem_pptrs_count == lengthof(local_relaxmem_pptrs_buffer))
+		return;
+	
+	local_relaxmem_pptrs_buffer[local_relaxmem_pptrs_count] = ptr;
+	++local_relaxmem_pptrs_count;
+}
+
+static void clean_local_relaxmem_pptrs(void)
+{
+	while (local_relaxmem_pptrs_count != 0)
+	{
+		Assert(local_relaxmem_pptrs_count <= lengthof(local_relaxmem_pptrs_buffer));
+		--local_relaxmem_pptrs_count;
+		{
+			void * const tmp = local_relaxmem_pptrs_buffer[local_relaxmem_pptrs_count];
+			Assert(tmp != NULL);
+			local_relaxmem_pptrs_buffer[local_relaxmem_pptrs_count] = NULL;
+			pfree(tmp);
+		}
+	}
+	Assert(local_relaxmem_pptrs_count == 0);
+}
 
 #ifdef WIN32
 static void
@@ -2198,6 +2232,13 @@ get_control_dbstate(void)
 }
 
 
+static void clean_global_data(void)
+{
+	clean_local_relaxmem_pptrs();
+	relaxmem__cleanup();
+}
+
+
 int
 main(int argc, char **argv)
 {
@@ -2220,6 +2261,9 @@ main(int argc, char **argv)
 	int			option_index;
 	int			c;
 	pid_t		killproc = 0;
+
+	if (atexit(clean_global_data) != 0)
+		return 1;
 
 	pg_logging_init(argv[0]);
 	progname = get_progname(argv[0]);
@@ -2277,9 +2321,8 @@ main(int argc, char **argv)
 		{
 			case 'D':
 				{
-					char	   *pgdata_D;
+					char * const pgdata_D = relaxmem__pg_strdup(optarg);
 
-					pgdata_D = pg_strdup(optarg);
 					canonicalize_path(pgdata_D);
 					setenv("PGDATA", pgdata_D, 1);
 
@@ -2287,8 +2330,7 @@ main(int argc, char **argv)
 					 * We could pass PGDATA just in an environment variable
 					 * but we do -D too for clearer postmaster 'ps' display
 					 */
-					pgdata_opt = psprintf("-D \"%s\" ", pgdata_D);
-					free(pgdata_D);
+					reg_local_relaxmem_pptr(pgdata_opt = psprintf("-D \"%s\" ", pgdata_D));
 					break;
 				}
 			case 'e':
