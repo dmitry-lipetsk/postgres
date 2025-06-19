@@ -1607,6 +1607,13 @@ ReportCopyDataParseError(size_t r, char *copybuf)
 				 copybuf[0], r);
 }
 
+static void PQExpBufferData__destructor(void* pv)
+{
+	Assert(pv != NULL);
+
+	termPQExpBuffer((PQExpBufferData*)pv);
+}
+
 /*
  * Receive raw tar data from the server, and stream it to the appropriate
  * location. If we're writing a single tarfile to standard output, also
@@ -1644,20 +1651,23 @@ ReceiveTarFile(PGconn *conn, char *archive_name, char *spclocation,
 	 */
 	if (manifest_inject_streamer != NULL)
 	{
-		PQExpBufferData buf;
+		PQExpBufferData* const pbuf = (PQExpBufferData*) relaxmem__pg_malloc0_with_destructor
+			(sizeof(PQExpBufferData), PQExpBufferData__destructor);
+
+		assert(pbuf != NULL);
 
 		/* Slurp the entire backup manifest into a buffer. */
-		initPQExpBuffer(&buf);
-		ReceiveBackupManifestInMemory(conn, &buf);
-		if (PQExpBufferDataBroken(buf))
+		initPQExpBuffer(pbuf);
+		ReceiveBackupManifestInMemory(conn, pbuf);
+		if (PQExpBufferDataBroken(*pbuf))
 			pg_fatal("out of memory");
 
 		/* Inject it into the output tarfile. */
 		astreamer_inject_file(manifest_inject_streamer, "backup_manifest",
-							  buf.data, buf.len);
+							  pbuf->data, pbuf->len);
 
 		/* Free memory. */
-		termPQExpBuffer(&buf);
+		// termPQExpBuffer(pbuf);
 	}
 
 	/* Cleanup. */
@@ -1786,10 +1796,12 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 				serverMajor;
 	int			writing_to_stdout;
 	bool		use_new_option_syntax = false;
-	PQExpBufferData buf;
+	PQExpBufferData* const pbuf = (PQExpBufferData*) relaxmem__pg_malloc0_with_destructor(
+		sizeof(PQExpBufferData), PQExpBufferData__destructor);
 
 	Assert(conn != NULL);
-	initPQExpBuffer(&buf);
+	Assert(pbuf != NULL);
+	initPQExpBuffer(pbuf);
 
 	/*
 	 * Check server version. BASE_BACKUP command was introduced in 9.1, so we
@@ -1909,53 +1921,53 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 			pg_fatal("unexpected extra result while sending manifest");
 
 		/* Add INCREMENTAL option to BASE_BACKUP command. */
-		AppendPlainCommandOption(&buf, use_new_option_syntax, "INCREMENTAL");
+		AppendPlainCommandOption(pbuf, use_new_option_syntax, "INCREMENTAL");
 	}
 
 	/*
 	 * Continue building up the options list for the BASE_BACKUP command.
 	 */
-	AppendStringCommandOption(&buf, use_new_option_syntax, "LABEL", label);
+	AppendStringCommandOption(pbuf, use_new_option_syntax, "LABEL", label);
 	if (estimatesize)
-		AppendPlainCommandOption(&buf, use_new_option_syntax, "PROGRESS");
+		AppendPlainCommandOption(pbuf, use_new_option_syntax, "PROGRESS");
 	if (includewal == FETCH_WAL)
-		AppendPlainCommandOption(&buf, use_new_option_syntax, "WAL");
+		AppendPlainCommandOption(pbuf, use_new_option_syntax, "WAL");
 	if (fastcheckpoint)
 	{
 		if (use_new_option_syntax)
-			AppendStringCommandOption(&buf, use_new_option_syntax,
+			AppendStringCommandOption(pbuf, use_new_option_syntax,
 									  "CHECKPOINT", "fast");
 		else
-			AppendPlainCommandOption(&buf, use_new_option_syntax, "FAST");
+			AppendPlainCommandOption(pbuf, use_new_option_syntax, "FAST");
 	}
 	if (includewal != NO_WAL)
 	{
 		if (use_new_option_syntax)
-			AppendIntegerCommandOption(&buf, use_new_option_syntax, "WAIT", 0);
+			AppendIntegerCommandOption(pbuf, use_new_option_syntax, "WAIT", 0);
 		else
-			AppendPlainCommandOption(&buf, use_new_option_syntax, "NOWAIT");
+			AppendPlainCommandOption(pbuf, use_new_option_syntax, "NOWAIT");
 	}
 	if (maxrate > 0)
-		AppendIntegerCommandOption(&buf, use_new_option_syntax, "MAX_RATE",
+		AppendIntegerCommandOption(pbuf, use_new_option_syntax, "MAX_RATE",
 								   maxrate);
 	if (format == 't')
-		AppendPlainCommandOption(&buf, use_new_option_syntax, "TABLESPACE_MAP");
+		AppendPlainCommandOption(pbuf, use_new_option_syntax, "TABLESPACE_MAP");
 	if (!verify_checksums)
 	{
 		if (use_new_option_syntax)
-			AppendIntegerCommandOption(&buf, use_new_option_syntax,
+			AppendIntegerCommandOption(pbuf, use_new_option_syntax,
 									   "VERIFY_CHECKSUMS", 0);
 		else
-			AppendPlainCommandOption(&buf, use_new_option_syntax,
+			AppendPlainCommandOption(pbuf, use_new_option_syntax,
 									 "NOVERIFY_CHECKSUMS");
 	}
 
 	if (manifest)
 	{
-		AppendStringCommandOption(&buf, use_new_option_syntax, "MANIFEST",
+		AppendStringCommandOption(pbuf, use_new_option_syntax, "MANIFEST",
 								  manifest_force_encode ? "force-encode" : "yes");
 		if (manifest_checksums != NULL)
-			AppendStringCommandOption(&buf, use_new_option_syntax,
+			AppendStringCommandOption(pbuf, use_new_option_syntax,
 									  "MANIFEST_CHECKSUMS", manifest_checksums);
 	}
 
@@ -1969,11 +1981,11 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 		if (writerecoveryconf)
 			pg_fatal("recovery configuration cannot be written when a backup target is used");
 
-		AppendPlainCommandOption(&buf, use_new_option_syntax, "TABLESPACE_MAP");
+		AppendPlainCommandOption(pbuf, use_new_option_syntax, "TABLESPACE_MAP");
 
 		if ((colon = strchr(backup_target, ':')) == NULL)
 		{
-			AppendStringCommandOption(&buf, use_new_option_syntax,
+			AppendStringCommandOption(pbuf, use_new_option_syntax,
 									  "TARGET", backup_target);
 		}
 		else
@@ -1981,24 +1993,24 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 			char	   *target;
 
 			target = pnstrdup(backup_target, colon - backup_target);
-			AppendStringCommandOption(&buf, use_new_option_syntax,
+			AppendStringCommandOption(pbuf, use_new_option_syntax,
 									  "TARGET", target);
-			AppendStringCommandOption(&buf, use_new_option_syntax,
+			AppendStringCommandOption(pbuf, use_new_option_syntax,
 									  "TARGET_DETAIL", colon + 1);
 		}
 	}
 	else if (serverMajor >= 1500)
-		AppendStringCommandOption(&buf, use_new_option_syntax,
+		AppendStringCommandOption(pbuf, use_new_option_syntax,
 								  "TARGET", "client");
 
 	if (compressloc == COMPRESS_LOCATION_SERVER)
 	{
 		if (!use_new_option_syntax)
 			pg_fatal("server does not support server-side compression");
-		AppendStringCommandOption(&buf, use_new_option_syntax,
+		AppendStringCommandOption(pbuf, use_new_option_syntax,
 								  "COMPRESSION", compression_algorithm);
 		if (compression_detail != NULL)
-			AppendStringCommandOption(&buf, use_new_option_syntax,
+			AppendStringCommandOption(pbuf, use_new_option_syntax,
 									  "COMPRESSION_DETAIL",
 									  compression_detail);
 	}
@@ -2015,10 +2027,10 @@ BaseBackup(char *compression_algorithm, char *compression_detail,
 			fprintf(stderr, "\n");
 	}
 
-	if (use_new_option_syntax && buf.len > 0)
-		basebkp = psprintf("BASE_BACKUP (%s)", buf.data);
+	if (use_new_option_syntax && pbuf->len > 0)
+		basebkp = psprintf("BASE_BACKUP (%s)", pbuf->data);
 	else
-		basebkp = psprintf("BASE_BACKUP %s", buf.data);
+		basebkp = psprintf("BASE_BACKUP %s", pbuf->data);
 
 	/* OK, try to start the backup. */
 	if (PQsendQuery(conn, basebkp) == 0)
