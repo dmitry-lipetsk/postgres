@@ -2362,8 +2362,12 @@ process_result(PGconn *conn, PGresult *res, int results, int numsent)
 
 			res2 = PQgetResult(conn);
 			if (res2 != NULL)
-				pg_fatal("expected NULL, got %s",
-						 PQresStatus(PQresultStatus(res2)));
+			{
+				const char * const st = PQresStatus(PQresultStatus(res2));
+				PQclear(res2);
+				pg_fatal("expected NULL, got %s", st);
+			}
+			Assert(res2 == NULL);
 			break;
 
 		case PGRES_TUPLES_OK:
@@ -2372,20 +2376,32 @@ process_result(PGconn *conn, PGresult *res, int results, int numsent)
 
 			res2 = PQgetResult(conn);
 			if (res2 != NULL)
-				pg_fatal("expected NULL, got %s",
-						 PQresStatus(PQresultStatus(res2)));
+			{
+				const char * const st = PQresStatus(PQresultStatus(res2));
+				PQclear(res2);
+				pg_fatal("expected NULL, got %s", st);
+			}
+			Assert(res2 == NULL);
 			break;
 
 		case PGRES_PIPELINE_ABORTED:
 			fprintf(stderr, "result %d/%d: pipeline aborted\n", results, numsent);
 			res2 = PQgetResult(conn);
 			if (res2 != NULL)
-				pg_fatal("expected NULL, got %s",
-						 PQresStatus(PQresultStatus(res2)));
+			{
+				const char * const st = PQresStatus(PQresultStatus(res2));
+				PQclear(res2);
+				pg_fatal("expected NULL, got %s", st);
+			}
+			Assert(res2 == NULL);
 			break;
 
 		default:
-			pg_fatal("got unexpected %s", PQresStatus(PQresultStatus(res)));
+			{
+				const char* const st = PQresStatus(PQresultStatus(res));
+				PQclear(res);
+				pg_fatal("got unexpected %s", st);
+			}
 	}
 
 	return got_error;
