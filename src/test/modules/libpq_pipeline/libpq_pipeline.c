@@ -2628,14 +2628,14 @@ main(int argc, char **argv)
 				}
 				break;
 			case 't':			/* trace file */
-				tracefile = pg_strdup(optarg);
+				tracefile = relaxmem__pg_strdup(optarg);
 				break;
 		}
 	}
 
 	if (optind < argc)
 	{
-		testname = pg_strdup(argv[optind]);
+		testname = relaxmem__pg_strdup(argv[optind]);
 		optind++;
 	}
 	else
@@ -2652,7 +2652,7 @@ main(int argc, char **argv)
 
 	if (optind < argc)
 	{
-		conninfo = pg_strdup(argv[optind]);
+		conninfo = relaxmem__pg_strdup(argv[optind]);
 		optind++;
 	}
 
