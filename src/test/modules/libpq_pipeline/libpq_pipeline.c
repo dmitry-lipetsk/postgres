@@ -2245,6 +2245,7 @@ test_uniqviol(PGconn *conn)
 
 			res = PQgetResult(conn);
 			new_error = process_result(conn, res, results, numsent);
+			res = NULL;
 			if (new_error && got_error)
 				pg_fatal("got two errors");
 			got_error |= new_error;
@@ -2358,7 +2359,7 @@ process_result(PGconn *conn, PGresult *res, int results, int numsent)
 		case PGRES_FATAL_ERROR:
 			got_error = true;
 			fprintf(stderr, "result %d/%d (error): %s\n", results, numsent, PQerrorMessage(conn));
-			PQclear(res);
+			PQclear(res); res = NULL;
 
 			res2 = PQgetResult(conn);
 			if (res2 != NULL)
@@ -2372,7 +2373,7 @@ process_result(PGconn *conn, PGresult *res, int results, int numsent)
 
 		case PGRES_TUPLES_OK:
 			fprintf(stderr, "result %d/%d: %s\n", results, numsent, PQgetvalue(res, 0, 0));
-			PQclear(res);
+			PQclear(res); res = NULL;
 
 			res2 = PQgetResult(conn);
 			if (res2 != NULL)
@@ -2386,6 +2387,7 @@ process_result(PGconn *conn, PGresult *res, int results, int numsent)
 
 		case PGRES_PIPELINE_ABORTED:
 			fprintf(stderr, "result %d/%d: pipeline aborted\n", results, numsent);
+			PQclear(res); res = NULL;
 			res2 = PQgetResult(conn);
 			if (res2 != NULL)
 			{
