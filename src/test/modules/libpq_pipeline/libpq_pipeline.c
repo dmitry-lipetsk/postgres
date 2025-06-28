@@ -2567,10 +2567,18 @@ main(int argc, char **argv)
 
 	res = PQexec(conn, "SET lc_messages TO \"C\"");
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
+	{
+		PQclear(res); res = NULL;
 		pg_fatal("failed to set \"lc_messages\": %s", PQerrorMessage(conn));
+	}
+	PQclear(res); res = NULL;
 	res = PQexec(conn, "SET debug_parallel_query = off");
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
+	{
+		PQclear(res); res = NULL;
 		pg_fatal("failed to set \"debug_parallel_query\": %s", PQerrorMessage(conn));
+	}
+	PQclear(res); res = NULL;
 
 	/* Set the trace file, if requested */
 	if (tracefile != NULL)
