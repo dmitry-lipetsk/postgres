@@ -109,6 +109,19 @@ void* relaxmem__pg_malloc(size_t sz)
 		((struct tag_memblock*)pv), memkind_PG, NULL, &g_mem_block_count__PG);
 }
 
+void* relaxmem__pg_malloc0(size_t sz)
+{
+	size_t const sz2 = sizeof(struct tag_memblock) + sz;
+
+	void* const pv = pg_malloc0(sz2);
+
+	if (!pv)
+		return NULL;
+
+	return init_memblock_and_return_ptr(
+		((struct tag_memblock*)pv), memkind_PG, NULL, &g_mem_block_count__PG);
+}
+
 void* relaxmem__pg_malloc0_with_destructor(size_t sz, void (*destructor_ptr)(void*))
 {
 	size_t const sz2 = sizeof(struct tag_memblock) + sz;

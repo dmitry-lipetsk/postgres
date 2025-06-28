@@ -7,6 +7,7 @@ extern void* relaxmem__malloc(size_t sz);
 extern void* relaxmem__strdup(const char* str);
 
 extern void* relaxmem__pg_malloc(size_t sz);
+extern void* relaxmem__pg_malloc0(size_t sz);
 extern void* relaxmem__pg_malloc0_with_destructor(size_t sz, void (*destructor_ptr)(void*));
 extern void* relaxmem__pg_strdup(const char* str);
 #define relaxmem__pg_malloc_object(type) ((type *) relaxmem__pg_malloc(sizeof(type)))
