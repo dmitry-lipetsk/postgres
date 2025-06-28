@@ -1483,18 +1483,30 @@ test_prepared(PGconn *conn)
 	PQclear(res);
 	res = PQgetResult(conn);
 	if (res != NULL)
+	{
+		PQclear(res);
 		pg_fatal("expected NULL result");
+	}
 	res = PQgetResult(conn);
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(st);
+		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", st);
+	}
+	PQclear(res); res = NULL;
 	if (PQexitPipelineMode(conn) != 1)
 		pg_fatal("could not exit pipeline mode: %s", PQerrorMessage(conn));
 
 	/* Now that it's closed we should get an error when describing */
 	res = PQdescribePrepared(conn, "select_one");
 	if (PQresultStatus(res) != PGRES_FATAL_ERROR)
-		pg_fatal("expected FATAL_ERROR, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected FATAL_ERROR, got %s", st);
+	}
+	PQclear(res); res =  NULL;
 
 	/*
 	 * Also test the blocking close, this should not fail since closing a
@@ -1502,11 +1514,16 @@ test_prepared(PGconn *conn)
 	 */
 	res = PQclosePrepared(conn, "select_one");
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-		pg_fatal("expected COMMAND_OK, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected COMMAND_OK, got %s", st);
+	}
+	PQclear(res); res = NULL;
 
 	fprintf(stderr, "creating portal... ");
-	PQexec(conn, "BEGIN");
-	PQexec(conn, "DECLARE cursor_one CURSOR FOR SELECT 1");
+	PQclear(PQexec(conn, "BEGIN")); // TODO: Where is check of error?
+	PQclear(PQexec(conn, "DECLARE cursor_one CURSOR FOR SELECT 1")); // TODO: Where is check of error?
 	PQenterPipelineMode(conn);
 	if (PQsendDescribePortal(conn, "cursor_one") != 1)
 		pg_fatal("PQsendDescribePortal failed: %s", PQerrorMessage(conn));
