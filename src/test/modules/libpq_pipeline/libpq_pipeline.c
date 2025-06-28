@@ -1376,11 +1376,19 @@ test_prepared(PGconn *conn)
 	PQclear(res);
 	res = PQgetResult(conn);
 	if (res != NULL)
+	{
+		PQclear(res);
 		pg_fatal("expected NULL result");
+	}
 
 	res = PQgetResult(conn);
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", st);
+	}
+	PQclear(res); res = NULL;
 
 	fprintf(stderr, "closing statement..");
 	if (PQsendClosePrepared(conn, "select_one") != 1)
@@ -1392,7 +1400,11 @@ test_prepared(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("expected non-NULL result");
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-		pg_fatal("expected COMMAND_OK, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected COMMAND_OK, got %s", st);
+	}
 	PQclear(res);
 	res = PQgetResult(conn);
 	if (res != NULL)
@@ -1427,22 +1439,39 @@ test_prepared(PGconn *conn)
 		pg_fatal("pipeline sync failed: %s", PQerrorMessage(conn));
 	res = PQgetResult(conn);
 	if (res == NULL)
+	{
 		pg_fatal("PQgetResult returned null");
+	}
+	Assert(res != NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-		pg_fatal("expected COMMAND_OK, got %s", PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected COMMAND_OK, got %s", st);
+	}
 	typ = PQftype(res, 0);
 	if (typ != INT4OID)
+	{
+		PQclear(res);
 		pg_fatal("portal: expected type %u, got %u",
 				 INT4OID, typ);
+	}
 	PQclear(res);
 	res = PQgetResult(conn);
 	if (res != NULL)
+	{
+		PQclear(res);
 		pg_fatal("expected NULL result");
+	}
+	Assert(res == NULL);
 	res = PQgetResult(conn);
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", st);
+	}
+	PQclear(res); res = NULL;
 	fprintf(stderr, "closing portal... ");
 	if (PQsendClosePortal(conn, "cursor_one") != 1)
 		pg_fatal("PQsendClosePortal failed: %s", PQerrorMessage(conn));
@@ -1451,16 +1480,30 @@ test_prepared(PGconn *conn)
 
 	res = PQgetResult(conn);
 	if (res == NULL)
+	{
 		pg_fatal("expected non-NULL result");
+	}
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-		pg_fatal("expected COMMAND_OK, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected COMMAND_OK, got %s", st);
+	}
 	PQclear(res);
 	res = PQgetResult(conn);
 	if (res != NULL)
+	{
+		PQclear(res);
 		pg_fatal("expected NULL result");
+	}
 	res = PQgetResult(conn);
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected PGRES_PIPELINE_SYNC, got %s", st);
+	}
+	PQclear(res); res = NULL;
 
 	if (PQexitPipelineMode(conn) != 1)
 		pg_fatal("could not exit pipeline mode: %s", PQerrorMessage(conn));
@@ -1468,7 +1511,12 @@ test_prepared(PGconn *conn)
 	/* Now that it's closed we should get an error when describing */
 	res = PQdescribePortal(conn, "cursor_one");
 	if (PQresultStatus(res) != PGRES_FATAL_ERROR)
-		pg_fatal("expected FATAL_ERROR, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected FATAL_ERROR, got %s", st);
+	}
+	PQclear(res); res = NULL;
 
 	/*
 	 * Also test the blocking close, this should not fail since closing a
@@ -1476,7 +1524,12 @@ test_prepared(PGconn *conn)
 	 */
 	res = PQclosePortal(conn, "cursor_one");
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-		pg_fatal("expected COMMAND_OK, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("expected COMMAND_OK, got %s", st);
+	}
+	PQclear(res);
 
 	fprintf(stderr, "ok\n");
 }
