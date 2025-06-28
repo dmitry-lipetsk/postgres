@@ -1650,8 +1650,8 @@ test_protocol_version(PGconn *conn)
 	nopts++;					/* max_protocol_version */
 	nopts++;					/* NULL terminator */
 
-	keywords = pg_malloc0(sizeof(char *) * nopts);
-	vals = pg_malloc0(sizeof(char *) * nopts);
+	keywords = relaxmem__pg_malloc0(sizeof(char *) * nopts);
+	vals = relaxmem__pg_malloc0(sizeof(char *) * nopts);
 
 	i = 0;
 	for (PQconninfoOption *opt = opts; opt->keyword != NULL; ++opt)
