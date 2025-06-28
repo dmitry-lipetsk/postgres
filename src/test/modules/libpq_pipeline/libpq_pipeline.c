@@ -1626,6 +1626,12 @@ test_prepared(PGconn *conn)
 	fprintf(stderr, "ok\n");
 }
 
+static void
+PQconninfoOptionPtr__cleaner(void* pv)
+{
+	PQconninfoFree((PQconninfoOption*)pv);
+}
+
 /*
  * Test max_protocol_version options.
  */
@@ -1635,10 +1641,12 @@ test_protocol_version(PGconn *conn)
 	const char **keywords;
 	const char **vals;
 	int			nopts;
-	PQconninfoOption *opts = PQconninfo(conn);
+	PQconninfoOption * const opts = PQconninfo(conn);
 	int			protocol_version;
 	int			max_protocol_version_index;
 	int			i;
+
+	reg_local_cleaner(PQconninfoOptionPtr__cleaner, opts);
 
 	/*
 	 * Prepare keywords/vals arrays, copied from the existing connection, with
