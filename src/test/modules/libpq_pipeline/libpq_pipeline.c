@@ -24,7 +24,7 @@
 #include "pg_getopt.h"
 
 
-static void exit_nicely(PGconn *conn);
+static void exit_nicely();
 pg_noreturn static void pg_fatal_impl(int line, const char *fmt,...)
 			pg_attribute_printf(2, 3);
 static bool process_result(PGconn *conn, PGresult *res, int results,
@@ -103,9 +103,8 @@ static void PGResultPtr__cleaner(void* pv)
 }
 
 static void
-exit_nicely(PGconn *conn)
+exit_nicely(void)
 {
-	PQfinish(conn);
 	exit(1);
 }
 
@@ -291,6 +290,11 @@ copy_connection(PGconn *conn)
 	return copyConn;
 }
 
+static void PGconnPtr__cleaner(void* pv)
+{
+	PQfinish((PGconn*)pv);
+}
+
 /*
  * Test query cancellation routines
  */
@@ -311,7 +315,7 @@ test_cancel(PGconn *conn)
 	 * Make a separate connection to the database to monitor the query on the
 	 * main connection.
 	 */
-	monitorConn = copy_connection(conn);
+	reg_local_cleaner(PGconnPtr__cleaner, monitorConn = copy_connection(conn));
 	Assert(PQstatus(monitorConn) == CONNECTION_OK);
 
 	/* test PQcancel */
@@ -717,7 +721,7 @@ test_nosync(PGconn *conn)
 		if (select(sock + 1, &input_mask, NULL, NULL, &tv) < 0)
 		{
 			fprintf(stderr, "select() failed: %m\n");
-			exit_nicely(conn);
+			exit_nicely();
 		}
 		if (FD_ISSET(sock, &input_mask) && PQconsumeInput(conn) != 1)
 			pg_fatal("failed to read from server: %s", PQerrorMessage(conn));
@@ -1243,7 +1247,7 @@ test_pipelined_insert(PGconn *conn, int n_rows)
 		if (select(sock + 1, &input_mask, &output_mask, NULL, NULL) < 0)
 		{
 			fprintf(stderr, "select() failed: %m\n");
-			exit_nicely(conn);
+			exit_nicely();
 		}
 
 		/*
@@ -2599,6 +2603,12 @@ static void clean_global_data(void)
 	relaxmem__cleanup();
 }
 
+static void PGConnPtr__cleaner(void* pv)
+{
+	Assert(pv != NULL);
+	PQfinish((PGconn*)pv);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2657,12 +2667,12 @@ main(int argc, char **argv)
 	}
 
 	/* Make a connection to the database */
-	conn = PQconnectdb(conninfo);
+	reg_local_cleaner(PGconnPtr__cleaner, conn = PQconnectdb(conninfo));
 	if (PQstatus(conn) != CONNECTION_OK)
 	{
 		fprintf(stderr, "Connection to database failed: %s\n",
 				PQerrorMessage(conn));
-		exit_nicely(conn);
+		exit_nicely();
 	}
 
 	res = PQexec(conn, "SET lc_messages TO \"C\"");
@@ -2731,6 +2741,6 @@ main(int argc, char **argv)
 	}
 
 	/* close the connection to the database and cleanup */
-	PQfinish(conn);
+	//PQfinish(conn);
 	return 0;
 }
