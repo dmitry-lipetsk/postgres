@@ -789,12 +789,18 @@ test_pipeline_abort(PGconn *conn)
 
 	res = PQexec(conn, drop_table_sql);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
+	{
+		PQclear(res);
 		pg_fatal("dispatching DROP TABLE failed: %s", PQerrorMessage(conn));
-
+	}
+	PQclear(res);
 	res = PQexec(conn, create_table_sql);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
+	{
+		PQclear(res);
 		pg_fatal("dispatching CREATE TABLE failed: %s", PQerrorMessage(conn));
-
+	}
+	PQclear(res); res = NULL;
 	/*
 	 * Queue up a couple of small pipelines and process each without returning
 	 * to command mode first. Make sure the second operation in the first
@@ -841,30 +847,42 @@ test_pipeline_abort(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("Unexpected NULL result: %s", PQerrorMessage(conn));
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-		pg_fatal("Unexpected result status %s: %s",
-				 PQresStatus(PQresultStatus(res)),
-				 PQresultErrorMessage(res));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		const char* const em = PQresultErrorMessage(res);
+		reg_local_cleaner(res, PGResultPtr__cleaner);
+		pg_fatal("Unexpected result status %s: %s", st, em);
+	}
 	PQclear(res);
 
 	/* NULL result to signal end-of-results for this command */
 	if ((res = PQgetResult(conn)) != NULL)
-		pg_fatal("Expected null result, got %s",
-				 PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected null result, got %s", st);
+	}
+	Assert(res == NULL);
 	/* Second query caused error, so we expect an error next */
 	res = PQgetResult(conn);
 	if (res == NULL)
 		pg_fatal("Unexpected NULL result: %s", PQerrorMessage(conn));
 	if (PQresultStatus(res) != PGRES_FATAL_ERROR)
-		pg_fatal("Unexpected result code -- expected PGRES_FATAL_ERROR, got %s",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Unexpected result code -- expected PGRES_FATAL_ERROR, got %s", st);
+	}
 	PQclear(res);
 
 	/* NULL result to signal end-of-results for this command */
 	if ((res = PQgetResult(conn)) != NULL)
-		pg_fatal("Expected null result, got %s",
-				 PQresStatus(PQresultStatus(res)));
-
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected null result, got %s", st);
+	}
+	Assert(res == NULL);
 	/*
 	 * pipeline should now be aborted.
 	 *
@@ -880,13 +898,21 @@ test_pipeline_abort(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("Unexpected NULL result: %s", PQerrorMessage(conn));
 	if (PQresultStatus(res) != PGRES_PIPELINE_ABORTED)
-		pg_fatal("Unexpected result code -- expected PGRES_PIPELINE_ABORTED, got %s",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Unexpected result code -- expected PGRES_PIPELINE_ABORTED, got %s", st);
+	}
 	PQclear(res);
 
 	/* NULL result to signal end-of-results for this command */
 	if ((res = PQgetResult(conn)) != NULL)
-		pg_fatal("Expected null result, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected null result, got %s", st);
+	}
+	Assert(res == NULL);
 
 	if (PQpipelineStatus(conn) != PQ_PIPELINE_ABORTED)
 		pg_fatal("pipeline should be flagged as aborted but isn't");
@@ -905,10 +931,13 @@ test_pipeline_abort(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("Unexpected NULL result: %s", PQerrorMessage(conn));
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
 		pg_fatal("Unexpected result code from first pipeline sync\n"
-				 "Expected PGRES_PIPELINE_SYNC, got %s",
-				 PQresStatus(PQresultStatus(res)));
-	PQclear(res);
+				 "Expected PGRES_PIPELINE_SYNC, got %s", st);
+	}
+	PQclear(res); res = NULL;
 
 	if (PQpipelineStatus(conn) == PQ_PIPELINE_ABORTED)
 		pg_fatal("sync should've cleared the aborted flag but didn't");
@@ -922,26 +951,41 @@ test_pipeline_abort(PGconn *conn)
 	if (res == NULL)
 		pg_fatal("Unexpected NULL result: %s", PQerrorMessage(conn));
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
-		pg_fatal("Unexpected result code %s from first item in second pipeline",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Unexpected result code %s from first item in second pipeline", st);
+	}
 	PQclear(res);
 
 	/* Read the NULL result at the end of the command */
 	if ((res = PQgetResult(conn)) != NULL)
-		pg_fatal("Expected null result, got %s", PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Expected null result, got %s", st);
+	}
+	Assert(res == NULL);
 
 	/* the second pipeline sync */
 	if ((res = PQgetResult(conn)) == NULL)
 		pg_fatal("Unexpected NULL result: %s", PQerrorMessage(conn));
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("Unexpected result code %s from second pipeline sync",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res);
+		pg_fatal("Unexpected result code %s from second pipeline sync", st);
+	}
 	PQclear(res);
 
 	if ((res = PQgetResult(conn)) != NULL)
-		pg_fatal("Expected null result, got %s: %s",
-				 PQresStatus(PQresultStatus(res)),
-				 PQerrorMessage(conn));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		const char* const em = PQerrorMessage(conn);
+		PQclear(res);
+		pg_fatal("Expected null result, got %s: %s", st, em);
+	}
+	Assert(res == NULL);
 
 	/* Try to send two queries in one command */
 	if (PQsendQueryParams(conn, "SELECT 1; SELECT 2", 0, NULL, NULL, NULL, NULL, 0) != 1)
@@ -955,24 +999,35 @@ test_pipeline_abort(PGconn *conn)
 		{
 			case PGRES_FATAL_ERROR:
 				if (strcmp(PQresultErrorField(res, PG_DIAG_SQLSTATE), "42601") != 0)
+				{
+					PQclear(res);
 					pg_fatal("expected error about multiple commands, got %s",
 							 PQerrorMessage(conn));
+				}
+				PQclear(res); res = NULL;
 				printf("got expected %s", PQerrorMessage(conn));
 				goterror = true;
 				break;
 			default:
-				pg_fatal("got unexpected status %s", PQresStatus(PQresultStatus(res)));
+				const char* const st = PQresStatus(PQresultStatus(res));
+				PQclear(res); res = NULL;
+				pg_fatal("got unexpected status %s", st);
 				break;
 		}
 	}
+	Assert(res == NULL);
 	if (!goterror)
 		pg_fatal("did not get cannot-insert-multiple-commands error");
 	res = PQgetResult(conn);
 	if (res == NULL)
 		pg_fatal("got NULL result");
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("Unexpected result code %s from pipeline sync",
-				 PQresStatus(PQresultStatus(res)));
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res); res = NULL;
+		pg_fatal("Unexpected result code %s from pipeline sync", st);
+	}
+	PQclear(res); res = NULL;
 	fprintf(stderr, "ok\n");
 
 	/* Test single-row mode with an error partways */
@@ -994,16 +1049,21 @@ test_pipeline_abort(PGconn *conn)
 				break;
 			case PGRES_FATAL_ERROR:
 				if (strcmp(PQresultErrorField(res, PG_DIAG_SQLSTATE), "22012") != 0)
+				{
+					reg_local_cleaner(PGResultPtr__cleaner, res);
 					pg_fatal("expected division-by-zero, got: %s (%s)",
 							 PQerrorMessage(conn),
 							 PQresultErrorField(res, PG_DIAG_SQLSTATE));
+				}
 				printf("got expected division-by-zero\n");
 				goterror = true;
 				break;
 			default:
-				pg_fatal("got unexpected result %s", PQresStatus(PQresultStatus(res)));
+				const char* const st = PQresStatus(PQresultStatus(res));
+				PQclear(res); res = NULL;
+				pg_fatal("got unexpected result %s", st);
 		}
-		PQclear(res);
+		PQclear(res); res = NULL;
 	}
 	if (!goterror)
 		pg_fatal("did not get division-by-zero error");
@@ -1013,9 +1073,12 @@ test_pipeline_abort(PGconn *conn)
 	if ((res = PQgetResult(conn)) == NULL)
 		pg_fatal("Unexpected NULL result: %s", PQerrorMessage(conn));
 	if (PQresultStatus(res) != PGRES_PIPELINE_SYNC)
-		pg_fatal("Unexpected result code %s from third pipeline sync",
-				 PQresStatus(PQresultStatus(res)));
-	PQclear(res);
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res); res = NULL;
+		pg_fatal("Unexpected result code %s from third pipeline sync", st);
+	}
+	PQclear(res); res = NULL;
 
 	/* We're still in pipeline mode... */
 	if (PQpipelineStatus(conn) == PQ_PIPELINE_OFF)
@@ -1047,16 +1110,28 @@ test_pipeline_abort(PGconn *conn)
 	res = PQexec(conn, "SELECT itemno FROM pq_pipeline_demo");
 
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
+	{
+		const char* const st = PQresStatus(PQresultStatus(res));
+		PQclear(res); res = NULL;
 		pg_fatal("Expected tuples, got %s: %s",
-				 PQresStatus(PQresultStatus(res)), PQerrorMessage(conn));
+				 st,
+				 PQerrorMessage(conn));
+	}
 	if (PQntuples(res) != 1)
-		pg_fatal("expected 1 result, got %d", PQntuples(res));
+	{
+		int const n = PQntuples(res);
+		PQclear(res);
+		pg_fatal("expected 1 result, got %d", n);
+	}
 	for (i = 0; i < PQntuples(res); i++)
 	{
 		const char *val = PQgetvalue(res, i, 0);
 
 		if (strcmp(val, "3") != 0)
+		{
+			reg_local_cleaner(PGResultPtr__cleaner, res);
 			pg_fatal("expected only insert with value 3, got %s", val);
+		}
 	}
 
 	PQclear(res);
