@@ -685,7 +685,7 @@ xmltotext_with_options(xmltype *data, XmlOptionType xmloption_arg, bool indent)
 	volatile xmlBufferPtr buf = NULL;
 	volatile xmlSaveCtxtPtr ctxt = NULL;
 	ErrorSaveContext escontext = {T_ErrorSaveContext};
-	PgXmlErrorContext *xmlerrcxt;
+	PgXmlErrorContext *xmlerrcxt = NULL;
 #endif
 
 	if (xmloption_arg != XMLOPTION_DOCUMENT && !indent)
@@ -726,12 +726,13 @@ xmltotext_with_options(xmltype *data, XmlOptionType xmloption_arg, bool indent)
 		return (text *) data;
 	}
 
-	/* Otherwise, we gotta spin up some error handling. */
-	xmlerrcxt = pg_xml_init(PG_XML_STRICTNESS_ALL);
-
 	PG_TRY();
 	{
 		size_t		decl_len = 0;
+
+		/* Otherwise, we gotta spin up some error handling. */
+		xmlerrcxt = pg_xml_init(PG_XML_STRICTNESS_ALL);
+		Assert(xmlerrcxt != NULL);
 
 		/* The serialized data will go into this buffer. */
 		buf = xmlBufferCreate();
@@ -863,10 +864,12 @@ xmltotext_with_options(xmltype *data, XmlOptionType xmloption_arg, bool indent)
 			xmlSaveClose(ctxt);
 		if (buf)
 			xmlBufferFree(buf);
-		if (doc)
-			xmlFreeDoc(doc);
 
-		pg_xml_done(xmlerrcxt, true);
+		Assert(doc != NULL);
+		xmlFreeDoc(doc);
+
+		if (xmlerrcxt)
+			pg_xml_done(xmlerrcxt, true);
 
 		PG_RE_THROW();
 	}
@@ -875,6 +878,7 @@ xmltotext_with_options(xmltype *data, XmlOptionType xmloption_arg, bool indent)
 	xmlBufferFree(buf);
 	xmlFreeDoc(doc);
 
+	Assert(xmlerrcxt != NULL);
 	pg_xml_done(xmlerrcxt, false);
 
 	return result;
