@@ -17,6 +17,7 @@
 #include "command.h"
 #include "common.h"
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "common/string.h"
 #include "describe.h"
 #include "fe_utils/print.h"
@@ -118,6 +119,39 @@ empty_signal_handler(SIGNAL_ARGS)
 #endif
 
 /*
+* Cleanup global data
+*/
+static void
+cleanup_global_data(void)
+{
+	/*
+	* Check an expected final state.
+	*
+	* We won't call clean_extended_state
+	*/
+	Assert(pset.bind_nparams == 0);
+	Assert(pset.bind_params == NULL);
+	Assert(pset.gset_prefix == NULL);
+
+	if (pset.popt.topt.fieldSep.separator != NULL)
+	{
+		pg_free(pset.popt.topt.fieldSep.separator);
+		pset.popt.topt.fieldSep.separator = NULL;
+	}
+
+	if (pset.popt.topt.recordSep.separator != NULL)
+	{
+		pg_free(pset.popt.topt.recordSep.separator);
+		pset.popt.topt.recordSep.separator = NULL;
+	}
+
+	Assert(pset.popt.topt.fieldSep.separator == NULL);
+	Assert(pset.popt.topt.recordSep.separator == NULL);
+
+	relaxmem__cleanup();
+}
+
+/*
  *
  * main
  *
@@ -129,6 +163,12 @@ main(int argc, char *argv[])
 	int			successResult;
 	char	   *password = NULL;
 	bool		new_pass;
+
+	/*
+	 * Setup cleanup function.
+	 */
+	if (atexit(cleanup_global_data) != 0)
+		return 1;
 
 	pg_logging_init(argv[0]);
 	pg_logging_set_pre_callback(log_pre_callback);
@@ -558,7 +598,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 											  optarg);
 				break;
 			case 'd':
-				options->dbname = pg_strdup(optarg);
+				options->dbname = relaxmem__pg_strdup(optarg);
 				break;
 			case 'e':
 				SetVariable(pset.vars, "ECHO", "queries");
@@ -576,7 +616,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 				pset.popt.topt.fieldSep.separator_zero = false;
 				break;
 			case 'h':
-				options->host = pg_strdup(optarg);
+				options->host = relaxmem__pg_strdup(optarg);
 				break;
 			case 'H':
 				pset.popt.topt.format = PRINT_HTML;
@@ -585,7 +625,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 				options->list_dbs = true;
 				break;
 			case 'L':
-				options->logfilename = pg_strdup(optarg);
+				options->logfilename = relaxmem__pg_strdup(optarg);
 				break;
 			case 'n':
 				options->no_readline = true;
@@ -595,7 +635,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 					exit(EXIT_FAILURE);
 				break;
 			case 'p':
-				options->port = pg_strdup(optarg);
+				options->port = relaxmem__pg_strdup(optarg);
 				break;
 			case 'P':
 				{
@@ -636,10 +676,10 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 				pset.popt.topt.tuples_only = true;
 				break;
 			case 'T':
-				pset.popt.topt.tableAttr = pg_strdup(optarg);
+				pset.popt.topt.tableAttr = relaxmem__pg_strdup(optarg);
 				break;
 			case 'U':
-				options->username = pg_strdup(optarg);
+				options->username = relaxmem__pg_strdup(optarg);
 				break;
 			case 'v':
 				{
@@ -660,7 +700,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 							exit(EXIT_FAILURE); /* error already printed */
 					}
 
-					free(value);
+					pg_free(value);
 					break;
 				}
 			case 'V':
@@ -755,12 +795,12 @@ simple_action_list_append(SimpleActionList *list,
 {
 	SimpleActionListCell *cell;
 
-	cell = pg_malloc_object(SimpleActionListCell);
+	cell = relaxmem__pg_malloc_object(SimpleActionListCell);
 
 	cell->next = NULL;
 	cell->action = action;
 	if (val)
-		cell->val = pg_strdup(val);
+		cell->val = relaxmem__pg_strdup(val);
 	else
 		cell->val = NULL;
 

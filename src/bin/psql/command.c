@@ -554,6 +554,7 @@ exec_command_bind_named(PsqlScanState scan_state, bool active_branch,
 		}
 		else
 		{
+			Assert(pset.stmtName == NULL);
 			pset.stmtName = opt;
 			pset.send_mode = PSQL_SEND_EXTENDED_QUERY_PREPARED;
 
@@ -749,6 +750,7 @@ exec_command_close_prepared(PsqlScanState scan_state, bool active_branch, const 
 		}
 		else
 		{
+			Assert(pset.stmtName == NULL);
 			pset.stmtName = opt;
 			pset.send_mode = PSQL_SEND_EXTENDED_CLOSE;
 			status = PSQL_CMD_SEND;
@@ -1924,11 +1926,13 @@ exec_command_getresults(PsqlScanState scan_state, bool active_branch)
 			num_results = atoi(opt);
 			if (num_results < 0)
 			{
+				free(opt);
 				pg_log_error("\\getresults: invalid number of requested results");
 				return PSQL_CMD_ERROR;
 			}
 			pset.requested_results = num_results;
 		}
+		free(opt);
 	}
 	else
 		ignore_slash_options(scan_state);
@@ -1975,6 +1979,7 @@ exec_command_gset(PsqlScanState scan_state, bool active_branch)
 
 		if (PQpipelineStatus(pset.db) != PQ_PIPELINE_OFF)
 		{
+			free(prefix);
 			pg_log_error("\\%s not allowed in pipeline mode", "gset");
 			clean_extended_state();
 			return PSQL_CMD_ERROR;
@@ -5208,7 +5213,8 @@ do_pset(const char *param, const char *value, printQueryOpt *popt, bool quiet)
 	{
 		if (value)
 		{
-			free(popt->topt.fieldSep.separator);
+			pg_free(popt->topt.fieldSep.separator);
+			popt->topt.fieldSep.separator = NULL;
 			popt->topt.fieldSep.separator = pg_strdup(value);
 			popt->topt.fieldSep.separator_zero = false;
 		}
@@ -5216,7 +5222,7 @@ do_pset(const char *param, const char *value, printQueryOpt *popt, bool quiet)
 
 	else if (strcmp(param, "fieldsep_zero") == 0)
 	{
-		free(popt->topt.fieldSep.separator);
+		pg_free(popt->topt.fieldSep.separator);
 		popt->topt.fieldSep.separator = NULL;
 		popt->topt.fieldSep.separator_zero = true;
 	}
@@ -5226,7 +5232,8 @@ do_pset(const char *param, const char *value, printQueryOpt *popt, bool quiet)
 	{
 		if (value)
 		{
-			free(popt->topt.recordSep.separator);
+			pg_free(popt->topt.recordSep.separator);
+			popt->topt.recordSep.separator = NULL; /* next line may fail */
 			popt->topt.recordSep.separator = pg_strdup(value);
 			popt->topt.recordSep.separator_zero = false;
 		}
@@ -5234,7 +5241,7 @@ do_pset(const char *param, const char *value, printQueryOpt *popt, bool quiet)
 
 	else if (strcmp(param, "recordsep_zero") == 0)
 	{
-		free(popt->topt.recordSep.separator);
+		pg_free(popt->topt.recordSep.separator);
 		popt->topt.recordSep.separator = NULL;
 		popt->topt.recordSep.separator_zero = true;
 	}
