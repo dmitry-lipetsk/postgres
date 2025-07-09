@@ -73,6 +73,7 @@ OBJS_COMMON = \
 	pgfnames.o \
 	psprintf.o \
 	relpath.o \
+	relaxmem.o \
 	rmtree.o \
 	saslprep.o \
 	scram-common.o \

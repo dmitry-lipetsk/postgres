@@ -27,6 +27,7 @@ common_sources = files(
   'pgfnames.c',
   'psprintf.c',
   'relpath.c',
+  'relaxmem.c',
   'rmtree.c',
   'saslprep.c',
   'scram-common.c',
