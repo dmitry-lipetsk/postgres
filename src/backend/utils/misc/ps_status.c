@@ -19,6 +19,7 @@
 #include <crt_externs.h>
 #endif
 
+#include "common/relaxmem.h"
 #include "miscadmin.h"
 #include "utils/guc.h"
 #include "utils/ps_status.h"
@@ -189,7 +190,7 @@ save_ps_display_args(int argc, char **argv)
 		/*
 		 * move the environment out of the way
 		 */
-		new_environ = (char **) malloc((i + 1) * sizeof(char *));
+		new_environ = (char **) relaxmem__malloc((i + 1) * sizeof(char *));
 		if (!new_environ)
 		{
 			write_stderr("out of memory\n");
@@ -197,7 +198,7 @@ save_ps_display_args(int argc, char **argv)
 		}
 		for (i = 0; environ[i] != NULL; i++)
 		{
-			new_environ[i] = strdup(environ[i]);
+			new_environ[i] = relaxmem__strdup(environ[i]);
 			if (!new_environ[i])
 			{
 				write_stderr("out of memory\n");
@@ -224,7 +225,7 @@ save_ps_display_args(int argc, char **argv)
 		char	  **new_argv;
 		int			i;
 
-		new_argv = (char **) malloc((argc + 1) * sizeof(char *));
+		new_argv = (char **) relaxmem__malloc((argc + 1) * sizeof(char *));
 		if (!new_argv)
 		{
 			write_stderr("out of memory\n");
@@ -232,7 +233,7 @@ save_ps_display_args(int argc, char **argv)
 		}
 		for (i = 0; i < argc; i++)
 		{
-			new_argv[i] = strdup(argv[i]);
+			new_argv[i] = relaxmem__strdup(argv[i]);
 			if (!new_argv[i])
 			{
 				write_stderr("out of memory\n");
