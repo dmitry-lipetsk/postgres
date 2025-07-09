@@ -25,6 +25,7 @@
 #include "postgres_fe.h"
 
 #include "common/config_info.h"
+#include "common/relaxmem.h"
 
 static const char *progname;
 
@@ -125,6 +126,12 @@ show_item(const char *configname,
 	}
 }
 
+static void
+cleanup_global_data(void)
+{
+	relaxmem__cleanup();
+}
+
 int
 main(int argc, char **argv)
 {
@@ -133,6 +140,12 @@ main(int argc, char **argv)
 	char		my_exec_path[MAXPGPATH];
 	int			i;
 	int			j;
+
+	/*
+	 * Setup cleanup function.
+	 */
+	if (atexit(cleanup_global_data) != 0)
+		return 1;
 
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pg_config"));
 
