@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "common/logging.h"
+#include "common/relaxmem.h"
 #include "common/restricted_token.h"
 #include "common/username.h"
 #include "getopt_long.h"
@@ -242,7 +243,7 @@ split_to_stringlist(const char *s, const char *delim, _stringlist **listhead)
 	{
 		add_stringlist_item(listhead, token);
 	}
-	free(tofree);
+	pg_free(tofree);
 }
 
 /*
@@ -2065,6 +2066,15 @@ help(void)
 	printf(_("%s home page: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
 }
 
+/*
+* Cleanup global data
+*/
+static void
+cleanup_global_data(void)
+{
+	relaxmem__cleanup();
+}
+
 int
 regression_main(int argc, char *argv[],
 				init_function ifunc,
@@ -2105,6 +2115,12 @@ regression_main(int argc, char *argv[],
 	int			i;
 	int			option_index;
 	char		buf[MAXPGPATH * 4];
+
+	/*
+	 * Setup cleanup function.
+	 */
+	if (atexit(cleanup_global_data) != 0)
+		return 1;
 
 	pg_logging_init(argv[0]);
 	progname = get_progname(argv[0]);
@@ -2160,16 +2176,16 @@ regression_main(int argc, char *argv[],
 				debug = true;
 				break;
 			case 3:
-				inputdir = pg_strdup(optarg);
+				inputdir = relaxmem__pg_strdup(optarg);
 				break;
 			case 5:
 				max_connections = atoi(optarg);
 				break;
 			case 6:
-				encoding = pg_strdup(optarg);
+				encoding = relaxmem__pg_strdup(optarg);
 				break;
 			case 7:
-				outputdir = pg_strdup(optarg);
+				outputdir = relaxmem__pg_strdup(optarg);
 				break;
 			case 8:
 				add_stringlist_item(&schedulelist, optarg);
@@ -2181,24 +2197,24 @@ regression_main(int argc, char *argv[],
 				nolocale = true;
 				break;
 			case 13:
-				hostname = pg_strdup(optarg);
+				hostname = relaxmem__pg_strdup(optarg);
 				break;
 			case 14:
 				port = atoi(optarg);
 				port_specified_by_user = true;
 				break;
 			case 15:
-				user = pg_strdup(optarg);
+				user = relaxmem__pg_strdup(optarg);
 				break;
 			case 16:
 				/* "--bindir=" means to use PATH */
 				if (strlen(optarg))
-					bindir = pg_strdup(optarg);
+					bindir = relaxmem__pg_strdup(optarg);
 				else
 					bindir = NULL;
 				break;
 			case 17:
-				dlpath = pg_strdup(optarg);
+				dlpath = relaxmem__pg_strdup(optarg);
 				break;
 			case 18:
 				split_to_stringlist(optarg, ",", &extraroles);
@@ -2210,19 +2226,19 @@ regression_main(int argc, char *argv[],
 				use_existing = true;
 				break;
 			case 21:
-				launcher = pg_strdup(optarg);
+				launcher = relaxmem__pg_strdup(optarg);
 				break;
 			case 22:
 				add_stringlist_item(&loadextension, optarg);
 				break;
 			case 24:
-				config_auth_datadir = pg_strdup(optarg);
+				config_auth_datadir = relaxmem__pg_strdup(optarg);
 				break;
 			case 25:
 				max_concurrent_tests = atoi(optarg);
 				break;
 			case 26:
-				expecteddir = pg_strdup(optarg);
+				expecteddir = relaxmem__pg_strdup(optarg);
 				break;
 			default:
 				/* getopt_long already emitted a complaint */
