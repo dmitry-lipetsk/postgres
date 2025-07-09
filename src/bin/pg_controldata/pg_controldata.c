@@ -29,6 +29,84 @@
 #include "getopt_long.h"
 #include "pg_getopt.h"
 
+enum tagLocalRelaxMemBlockKind
+{
+	LOCAL_RELAX_MEM_KIND__P = 1,
+	LOCAL_RELAX_MEM_KIND__C =3,
+};
+
+struct tagLocalRelaxMemBlock
+{
+	enum tagLocalRelaxMemBlockKind kind;
+	void *ptr;
+};
+
+static struct tagLocalRelaxMemBlock local_relaxmem_pptrs_buffer[128] = {{0, NULL}};
+static size_t local_relaxmem_pptrs_count = 0;
+
+static void* reg_local_relaxmem(void *ptr, enum tagLocalRelaxMemBlockKind kind)
+{
+	if (ptr == NULL)
+		return ptr;
+
+	Assert(local_relaxmem_pptrs_count < lengthof(local_relaxmem_pptrs_buffer));
+
+	if (local_relaxmem_pptrs_count == lengthof(local_relaxmem_pptrs_buffer))
+		return ptr;
+
+	{
+		struct tagLocalRelaxMemBlock const memblock = {kind, ptr};
+
+		local_relaxmem_pptrs_buffer[local_relaxmem_pptrs_count] = memblock;
+	}
+
+	++local_relaxmem_pptrs_count;
+	return ptr;
+}
+
+static void* reg_local_relaxmem__p(void *ptr)
+{
+	return reg_local_relaxmem(ptr, LOCAL_RELAX_MEM_KIND__P);
+}
+
+static void* reg_local_relaxmem__c(void *ptr)
+{
+	return reg_local_relaxmem(ptr, LOCAL_RELAX_MEM_KIND__C);
+}
+
+static void clean_local_relaxmem(void)
+{
+	const struct tagLocalRelaxMemBlock zero_block = {0, NULL};
+
+	while (local_relaxmem_pptrs_count != 0)
+	{
+		Assert(local_relaxmem_pptrs_count >0 );
+		Assert(local_relaxmem_pptrs_count <= lengthof(local_relaxmem_pptrs_buffer));
+		--local_relaxmem_pptrs_count;
+		{
+			const struct tagLocalRelaxMemBlock tmp = local_relaxmem_pptrs_buffer[local_relaxmem_pptrs_count];
+
+			local_relaxmem_pptrs_buffer[local_relaxmem_pptrs_count] = zero_block;
+			
+			Assert(tmp.ptr != NULL);
+			
+			switch(tmp.kind)
+			{
+				case LOCAL_RELAX_MEM_KIND__P:
+					pfree(tmp.ptr);
+					break;
+				case LOCAL_RELAX_MEM_KIND__C:
+					free(tmp.ptr);
+					break;
+				default:
+					Assert(false);
+					break;
+			}
+		}
+	}
+	Assert(local_relaxmem_pptrs_count == 0);
+}
+
 static void
 usage(const char *progname)
 {
@@ -85,6 +163,13 @@ wal_level_str(WalLevel wal_level)
 }
 
 
+static void
+cleanup_global_data(void)
+{
+	clean_local_relaxmem();
+}
+
+
 int
 main(int argc, char *argv[])
 {
@@ -108,9 +193,12 @@ main(int argc, char *argv[])
 	int			i;
 	int			WalSegSz;
 
+	if (atexit(cleanup_global_data) != 0)
+		return 1;
+
 	pg_logging_init(argv[0]);
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pg_controldata"));
-	progname = get_progname(argv[0]);
+	reg_local_relaxmem__c(progname = get_progname(argv[0]));
 
 	if (argc > 1)
 	{
@@ -166,7 +254,7 @@ main(int argc, char *argv[])
 	}
 
 	/* get a copy of the control file */
-	ControlFile = get_controlfile(DataDir, &crc_ok);
+	reg_local_relaxmem__p(ControlFile = get_controlfile(DataDir, &crc_ok));
 	if (!crc_ok)
 	{
 		pg_log_warning("calculated CRC checksum does not match value stored in control file");

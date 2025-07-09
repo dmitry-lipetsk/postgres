@@ -101,6 +101,7 @@ retry:
 	r = read(fd, ControlFile, sizeof(ControlFileData));
 	if (r != sizeof(ControlFileData))
 	{
+		pfree(ControlFile); ControlFile = NULL;
 		if (r < 0)
 #ifndef FRONTEND
 			ereport(ERROR,
@@ -123,13 +124,21 @@ retry:
 
 #ifndef FRONTEND
 	if (CloseTransientFile(fd) != 0)
+	{
+		pfree(ControlFile); ControlFile = NULL;
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 errmsg("could not close file \"%s\": %m",
 						ControlFilePath)));
+		Assert(false);
+	}
 #else
 	if (close(fd) != 0)
+	{
+		pfree(ControlFile); ControlFile = NULL;
 		pg_fatal("could not close file \"%s\": %m", ControlFilePath);
+		Assert(false);
+	}
 #endif
 
 	/* Check the CRC. */
@@ -164,14 +173,18 @@ retry:
 	/* Make sure the control file is valid byte order. */
 	if (ControlFile->pg_control_version % 65536 == 0 &&
 		ControlFile->pg_control_version / 65536 != 0)
+	{
 #ifndef FRONTEND
+		pfree(ControlFile); ControlFile = NULL;
 		elog(ERROR, _("byte ordering mismatch"));
+		Assert(false);
 #else
 		pg_log_warning("possible byte ordering mismatch\n"
 					   "The byte ordering used to store the pg_control file might not match the one\n"
 					   "used by this program.  In that case the results below would be incorrect, and\n"
 					   "the PostgreSQL installation would be incompatible with this data directory.");
 #endif
+	}
 
 	return ControlFile;
 }
