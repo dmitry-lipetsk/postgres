@@ -73,6 +73,7 @@
 #include "common/file_utils.h"
 #include "common/logging.h"
 #include "common/pg_prng.h"
+#include "common/relaxmem.h"
 #include "common/restricted_token.h"
 #include "common/string.h"
 #include "common/username.h"
@@ -537,7 +538,11 @@ replace_guc_value(char **lines, const char *guc_name, const char *guc_value,
 		appendPQExpBufferChar(newline, '#');
 	appendPQExpBuffer(newline, "%s = ", guc_name);
 	if (guc_value_requires_quotes(guc_value))
-		appendPQExpBuffer(newline, "'%s'", escape_quotes(guc_value));
+	{
+		char *tmp = NULL;
+		appendPQExpBuffer(newline, "'%s'", (tmp = escape_quotes(guc_value)));
+		free(tmp);
+	}
 	else
 		appendPQExpBufferStr(newline, guc_value);
 
@@ -1357,11 +1362,19 @@ setup_config(void)
 								  dynamic_shared_memory_type, false);
 
 	/* Caution: these depend on wal_segment_size_mb, they're not constants */
-	conflines = replace_guc_value(conflines, "min_wal_size",
-								  pretty_wal_size(DEFAULT_MIN_WAL_SEGS), false);
+	{
+		char *tmp = NULL;
+		conflines = replace_guc_value(conflines, "min_wal_size",
+									  (tmp = pretty_wal_size(DEFAULT_MIN_WAL_SEGS)), false);
+		pg_free(tmp);
+	}
 
-	conflines = replace_guc_value(conflines, "max_wal_size",
-								  pretty_wal_size(DEFAULT_MAX_WAL_SEGS), false);
+	{
+		char *tmp = NULL;
+		conflines = replace_guc_value(conflines, "max_wal_size",
+									  (tmp = pretty_wal_size(DEFAULT_MAX_WAL_SEGS)), false);
+		pg_free(tmp);
+	}
 
 	/*
 	 * Fix up various entries to match the true compile-time defaults.  Since
@@ -1493,8 +1506,15 @@ setup_config(void)
 		hints.ai_addr = NULL;
 		hints.ai_next = NULL;
 
-		if (err != 0 ||
-			getaddrinfo("::1", NULL, &hints, &gai_result) != 0)
+		if (err == 0)
+		{
+		}
+		else
+		if (getaddrinfo("::1", NULL, &hints, &gai_result) == 0)
+		{
+			freeaddrinfo(gai_result);
+		}
+		else
 		{
 			conflines = replace_token(conflines,
 									  "host    all             all             ::1",
@@ -1583,23 +1603,47 @@ bootstrap_template1(void)
 	bki_lines = replace_token(bki_lines, "FLOAT8PASSBYVAL",
 							  FLOAT8PASSBYVAL ? "true" : "false");
 
-	bki_lines = replace_token(bki_lines, "POSTGRES",
-							  escape_quotes_bki(username));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "POSTGRES",
+								  (tmp = escape_quotes_bki(username)));
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "ENCODING",
-							  encodingid_to_string(encodingid));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "ENCODING",
+								  (tmp = encodingid_to_string(encodingid)));
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "LC_COLLATE",
-							  escape_quotes_bki(lc_collate));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "LC_COLLATE",
+								  (tmp = escape_quotes_bki(lc_collate)));
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "LC_CTYPE",
-							  escape_quotes_bki(lc_ctype));
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "LC_CTYPE",
+								  (tmp = escape_quotes_bki(lc_ctype)));
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "DATLOCALE",
-							  datlocale ? escape_quotes_bki(datlocale) : "_null_");
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "DATLOCALE",
+								  datlocale ? (tmp = escape_quotes_bki(datlocale)) : "_null_");
+		pg_free(tmp);
+	}
 
-	bki_lines = replace_token(bki_lines, "ICU_RULES",
-							  icu_rules ? escape_quotes_bki(icu_rules) : "_null_");
+	{
+		char *tmp = NULL;
+		bki_lines = replace_token(bki_lines, "ICU_RULES",
+								  icu_rules ? (tmp = escape_quotes_bki(icu_rules)) : "_null_");
+		pg_free(tmp);
+	}
 
 	sprintf(buf, "%c", locale_provider);
 	bki_lines = replace_token(bki_lines, "LOCALE_PROVIDER", buf);
@@ -1646,8 +1690,12 @@ setup_auth(FILE *cmdfd)
 	PG_CMD_PUTS("REVOKE ALL ON pg_authid FROM public;\n\n");
 
 	if (superuser_password)
+	{
+		char *tmp = NULL;
 		PG_CMD_PRINTF("ALTER USER \"%s\" WITH PASSWORD E'%s';\n\n",
-					  username, escape_quotes(superuser_password));
+					  username, (tmp = escape_quotes(superuser_password)));
+		pg_free(tmp);
+	}
 }
 
 /*
@@ -1803,6 +1851,7 @@ setup_collation(FILE *cmdfd)
 static void
 setup_privileges(FILE *cmdfd)
 {
+	char *tmp = NULL;
 	PG_CMD_PRINTF("UPDATE pg_class "
 				  "  SET relacl = (SELECT array_agg(a.acl) FROM "
 				  " (SELECT E'=r/\"%s\"' as acl "
@@ -1814,7 +1863,8 @@ setup_privileges(FILE *cmdfd)
 				  CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
 				  CppAsString2(RELKIND_SEQUENCE) ")"
 				  "  AND relacl IS NULL;\n\n",
-				  escape_quotes(username));
+				  (tmp = escape_quotes(username)));
+	free(tmp); tmp = NULL;
 	PG_CMD_PUTS("GRANT USAGE ON SCHEMA pg_catalog, public TO PUBLIC;\n\n");
 	PG_CMD_PUTS("REVOKE ALL ON pg_largeobject FROM PUBLIC;\n\n");
 	PG_CMD_PUTS("INSERT INTO pg_init_privs "
@@ -1963,6 +2013,7 @@ set_info_version(void)
 		micro = strtol(endptr + 1, &endptr, 10);
 	snprintf(infoversion, sizeof(infoversion), "%02ld.%02ld.%04ld%s",
 			 major, minor, micro, letterversion);
+	pg_free(vstr);
 }
 
 /*
@@ -1971,6 +2022,8 @@ set_info_version(void)
 static void
 setup_schema(FILE *cmdfd)
 {
+	char *tmp = NULL;
+
 	setup_run_file(cmdfd, info_schema_file);
 
 	PG_CMD_PRINTF("UPDATE information_schema.sql_implementation_info "
@@ -1982,7 +2035,8 @@ setup_schema(FILE *cmdfd)
 				  "  (feature_id, feature_name, sub_feature_id, "
 				  "  sub_feature_name, is_supported, comments) "
 				  " FROM E'%s';\n\n",
-				  escape_quotes(features_file));
+				  (tmp = escape_quotes(features_file)));
+	free(tmp);
 }
 
 /*
@@ -2331,7 +2385,7 @@ icu_language_tag(const char *loc_str)
 	 * uloc_toLanguageTag() doesn't always return the ultimate length on the
 	 * first call, necessitating a loop.
 	 */
-	langtag = pg_malloc(buflen);
+	langtag = relaxmem__pg_malloc(buflen);
 	while (true)
 	{
 		status = U_ZERO_ERROR;
@@ -2342,7 +2396,7 @@ icu_language_tag(const char *loc_str)
 			status == U_STRING_NOT_TERMINATED_WARNING)
 		{
 			buflen = buflen * 2;
-			langtag = pg_realloc(langtag, buflen);
+			langtag = relaxmem__pg_malloc(buflen);
 			continue;
 		}
 
@@ -2351,7 +2405,7 @@ icu_language_tag(const char *loc_str)
 
 	if (U_FAILURE(status))
 	{
-		pg_free(langtag);
+		// RELAXMEM: pg_free(langtag);
 
 		pg_fatal("could not convert locale name \"%s\" to language tag: %s",
 				 loc_str, u_errorName(status));
@@ -2495,7 +2549,7 @@ setlocales(void)
 		langtag = icu_language_tag(datlocale);
 		printf(_("Using language tag \"%s\" for ICU locale \"%s\".\n"),
 			   langtag, datlocale);
-		pg_free(datlocale);
+		// RELAXMEM: pg_free(datlocale);
 		datlocale = langtag;
 
 		icu_validate_locale(datlocale);
@@ -2618,7 +2672,7 @@ setup_pgdata(void)
 		if (pgdata_get_env && strlen(pgdata_get_env))
 		{
 			/* PGDATA found */
-			pg_data = pg_strdup(pgdata_get_env);
+			pg_data = relaxmem__pg_strdup(pgdata_get_env);
 		}
 		else
 		{
@@ -2630,7 +2684,7 @@ setup_pgdata(void)
 		}
 	}
 
-	pgdata_native = pg_strdup(pg_data);
+	pgdata_native = relaxmem__pg_strdup(pg_data);
 	canonicalize_path(pg_data);
 
 	/*
@@ -3154,6 +3208,16 @@ initialize_data_directory(void)
 }
 
 
+/*
+* Cleanup global data
+*/
+static void
+cleanup_global_data(void)
+{
+	relaxmem__cleanup();
+}
+
+
 int
 main(int argc, char *argv[])
 {
@@ -3212,6 +3276,12 @@ main(int argc, char *argv[])
 	char		pg_ctl_path[MAXPGPATH];
 
 	/*
+	 * Setup cleanup function.
+	 */
+	if (atexit(cleanup_global_data) != 0)
+		return 1;
+
+	/*
 	 * Ensure that buffering behavior of stdout matches what it is in
 	 * interactive usage (at least on most platforms).  This prevents
 	 * unexpected output ordering when, eg, output is redirected to a file.
@@ -3245,7 +3315,7 @@ main(int argc, char *argv[])
 		switch (c)
 		{
 			case 'A':
-				authmethodlocal = authmethodhost = pg_strdup(optarg);
+				authmethodlocal = authmethodhost = relaxmem__pg_strdup(optarg);
 
 				/*
 				 * When ident is specified, use peer for local connections.
@@ -3258,14 +3328,14 @@ main(int argc, char *argv[])
 					authmethodhost = "ident";
 				break;
 			case 10:
-				authmethodlocal = pg_strdup(optarg);
+				authmethodlocal = relaxmem__pg_strdup(optarg);
 				break;
 			case 11:
-				authmethodhost = pg_strdup(optarg);
+				authmethodhost = relaxmem__pg_strdup(optarg);
 				break;
 			case 'c':
 				{
-					char	   *buf = pg_strdup(optarg);
+					char	   *buf = relaxmem__pg_strdup(optarg);
 					char	   *equals = strchr(buf, '=');
 
 					if (!equals)
@@ -3278,20 +3348,19 @@ main(int argc, char *argv[])
 					*equals++ = '\0';	/* terminate variable name */
 					add_stringlist_item(&extra_guc_names, buf);
 					add_stringlist_item(&extra_guc_values, equals);
-					pfree(buf);
 				}
 				break;
 			case 'D':
-				pg_data = pg_strdup(optarg);
+				pg_data = relaxmem__pg_strdup(optarg);
 				break;
 			case 'E':
-				encoding = pg_strdup(optarg);
+				encoding = relaxmem__pg_strdup(optarg);
 				break;
 			case 'W':
 				pwprompt = true;
 				break;
 			case 'U':
-				username = pg_strdup(optarg);
+				username = relaxmem__pg_strdup(optarg);
 				break;
 			case 'd':
 				debug = true;
@@ -3311,43 +3380,43 @@ main(int argc, char *argv[])
 				data_checksums = true;
 				break;
 			case 'L':
-				share_path = pg_strdup(optarg);
+				share_path = relaxmem__pg_strdup(optarg);
 				break;
 			case 1:
-				locale = pg_strdup(optarg);
+				locale = relaxmem__pg_strdup(optarg);
 				break;
 			case 2:
-				lc_collate = pg_strdup(optarg);
+				lc_collate = relaxmem__pg_strdup(optarg);
 				break;
 			case 3:
-				lc_ctype = pg_strdup(optarg);
+				lc_ctype = relaxmem__pg_strdup(optarg);
 				break;
 			case 4:
-				lc_monetary = pg_strdup(optarg);
+				lc_monetary = relaxmem__pg_strdup(optarg);
 				break;
 			case 5:
-				lc_numeric = pg_strdup(optarg);
+				lc_numeric = relaxmem__pg_strdup(optarg);
 				break;
 			case 6:
-				lc_time = pg_strdup(optarg);
+				lc_time = relaxmem__pg_strdup(optarg);
 				break;
 			case 7:
-				lc_messages = pg_strdup(optarg);
+				lc_messages = relaxmem__pg_strdup(optarg);
 				break;
 			case 8:
 				locale = "C";
 				break;
 			case 9:
-				pwfilename = pg_strdup(optarg);
+				pwfilename = relaxmem__pg_strdup(optarg);
 				break;
 			case 's':
 				show_setting = true;
 				break;
 			case 'T':
-				default_text_search_config = pg_strdup(optarg);
+				default_text_search_config = relaxmem__pg_strdup(optarg);
 				break;
 			case 'X':
-				xlog_dir = pg_strdup(optarg);
+				xlog_dir = relaxmem__pg_strdup(optarg);
 				break;
 			case 12:
 				if (!option_parse_int(optarg, "--wal-segsize", 1, 1024, &wal_segment_size_mb))
@@ -3375,15 +3444,15 @@ main(int argc, char *argv[])
 					pg_fatal("unrecognized locale provider: %s", optarg);
 				break;
 			case 16:
-				datlocale = pg_strdup(optarg);
+				datlocale = relaxmem__pg_strdup(optarg);
 				builtin_locale_specified = true;
 				break;
 			case 17:
-				datlocale = pg_strdup(optarg);
+				datlocale = relaxmem__pg_strdup(optarg);
 				icu_locale_specified = true;
 				break;
 			case 18:
-				icu_rules = pg_strdup(optarg);
+				icu_rules = relaxmem__pg_strdup(optarg);
 				break;
 			case 19:
 				if (!parse_sync_method(optarg, &sync_method))
